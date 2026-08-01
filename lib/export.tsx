@@ -8,7 +8,6 @@ import { createRoot, type Root } from 'react-dom/client'
 // maintained fork that adds support for those, drop-in API-compatible.
 import html2canvas from 'html2canvas-pro'
 import jsPDF from 'jspdf'
-import * as XLSX from 'xlsx'
 import { Filters, FilterOptions, EntityOption } from '@/types'
 import { formatAmount } from '@/lib/currency'
 
@@ -221,42 +220,4 @@ export function buildPdf(sections: PdfSection[], filterSummary: string, pageTitl
   })
 
   pdf.save(filename)
-}
-
-// --- Excel assembly ------------------------------------------------------
-
-export interface ExcelSheet {
-  name: string
-  columns: ExportColumn[]
-  rows: Record<string, unknown>[]
-}
-
-function sanitizeSheetName(name: string) {
-  return name.replace(/[:\\/?*[\]]/g, ' ').trim().slice(0, 31) || 'Sheet'
-}
-
-export function buildExcel(sheets: ExcelSheet[], filterSummary: string, filename: string) {
-  const wb = XLSX.utils.book_new()
-  const usedNames = new Set<string>()
-
-  for (const sheet of sheets) {
-    let name = sanitizeSheetName(sheet.name)
-    let suffix = 1
-    while (usedNames.has(name)) {
-      suffix += 1
-      name = sanitizeSheetName(`${sheet.name} ${suffix}`)
-    }
-    usedNames.add(name)
-
-    const aoa: (string | number)[][] = [
-      ['Filters', filterSummary],
-      [],
-      sheet.columns.map((c) => c.label),
-      ...sheet.rows.map((row) => sheet.columns.map((c) => (row[c.key] as string | number) ?? '')),
-    ]
-    const ws = XLSX.utils.aoa_to_sheet(aoa)
-    XLSX.utils.book_append_sheet(wb, ws, name)
-  }
-
-  XLSX.writeFile(wb, filename)
 }

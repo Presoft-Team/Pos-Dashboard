@@ -14,9 +14,10 @@ interface ItemGroup {
   description: string
   item_group: string | null
   item_type: string | null
+  cost: number         // one value per item, same across every branch
   unit_price: number
   qty_sold: number
-  branches: { branch_name: string; qty_on_hand: number; cost: number }[]
+  branches: { branch_name: string; qty_on_hand: number }[]
 }
 
 function groupByItem(rows: ItemCatalogRow[]): ItemGroup[] {
@@ -25,9 +26,9 @@ function groupByItem(rows: ItemCatalogRow[]): ItemGroup[] {
     const entry = map.get(row.item_id) ?? {
       item_id: row.item_id, item_code: row.item_code, description: row.description,
       item_group: row.item_group, item_type: row.item_type,
-      unit_price: row.unit_price, qty_sold: row.qty_sold, branches: [],
+      cost: row.cost, unit_price: row.unit_price, qty_sold: row.qty_sold, branches: [],
     }
-    if (row.branch_name) entry.branches.push({ branch_name: row.branch_name, qty_on_hand: row.qty_on_hand, cost: row.cost })
+    if (row.branch_name) entry.branches.push({ branch_name: row.branch_name, qty_on_hand: row.qty_on_hand })
     map.set(row.item_id, entry)
   }
   return [...map.values()]
@@ -119,6 +120,10 @@ export default function ItemPage() {
                 </div>
                 <div className="flex gap-6 text-right">
                   <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wide">Cost</p>
+                    <p className="font-semibold text-gray-900">{formatAmount(item.cost)}</p>
+                  </div>
+                  <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wide">Unit Price</p>
                     <p className="font-semibold text-gray-900">{formatAmount(item.unit_price)}</p>
                   </div>
@@ -136,7 +141,6 @@ export default function ItemPage() {
                       <tr className="bg-gray-50 text-left">
                         <th className="px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Branch</th>
                         <th className="px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Qty on Hand</th>
-                        <th className="px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Cost</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -144,7 +148,6 @@ export default function ItemPage() {
                         <tr key={i}>
                           <td className="px-4 py-2.5 text-gray-700">{b.branch_name}</td>
                           <td className="px-4 py-2.5 text-right text-gray-700">{b.qty_on_hand.toLocaleString()}</td>
-                          <td className="px-4 py-2.5 text-right font-semibold text-gray-900">{formatAmount(b.cost)}</td>
                         </tr>
                       ))}
                     </tbody>

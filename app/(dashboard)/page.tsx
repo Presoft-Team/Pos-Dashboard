@@ -85,6 +85,7 @@ export default function DashboardPage() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <FilterBar filters={filters} options={options} onChange={setFilters} />
+          <GroupByToggle value={groupBy} onChange={setGroupBy} />
           <button
             onClick={() => setExportOpen(true)}
             className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
@@ -100,10 +101,7 @@ export default function DashboardPage() {
 
       {/* Chart */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-900 text-sm">{chartTitle}</h3>
-          <GroupByToggle value={groupBy} onChange={setGroupBy} />
-        </div>
+        <h3 className="font-semibold text-gray-900 text-sm mb-4">{chartTitle}</h3>
         {loading ? (
           <div className="flex items-center justify-center h-[300px]">
             <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />

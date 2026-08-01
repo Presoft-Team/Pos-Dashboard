@@ -42,6 +42,7 @@ export interface KpiSummary {
   revenue_paid: number      // Cash + Credit-Paid
   revenue_not_due: number   // Credit, unpaid, not due
   revenue_overdue: number   // Credit, unpaid, overdue
+  total_cost: number        // quantity * items.cost, all sales combined
   cash_qty: number
   credit_qty: number
   cash_transactions: number

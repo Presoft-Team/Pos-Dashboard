@@ -18,6 +18,12 @@ type EntityField = (typeof ENTITY_FIELDS)[number]
 
 const GROUP_LABEL: Record<GroupByMode, string> = { item: 'Item', group: 'Group', type: 'Type' }
 
+interface Focus {
+  field: EntityField
+  id: string
+  name: string
+}
+
 function chartData(rows: PerformanceRow[]) {
   return pivotRevenueByCurrency(
     rows.map((r) => ({ ...r, total_revenue: r.credit_revenue + r.cash_revenue, total_qty: r.credit_qty + r.cash_qty })),
@@ -28,7 +34,12 @@ function chartData(rows: PerformanceRow[]) {
 export default function PerformancePage() {
   const supabase = createClient()
 
+  // FilterBar's 5 entity fields are independent filters, just like Date
+  // Range — all can be set at once. `focus` is a separate, click-only
+  // selection (still just one at a time) that layers on top of whatever
+  // filters are active.
   const [filters, setFiltersState] = useState<Filters>(DEFAULT_FILTERS)
+  const [focus, setFocus] = useState<Focus | null>(null)
   const [options, setOptions] = useState<FilterOptions>(DEFAULT_OPTIONS)
   const [groupBy, setGroupBy] = useState<GroupByMode>('item')
   const [branchRows, setBranchRows] = useState<PerformanceRow[]>([])
@@ -40,35 +51,55 @@ export default function PerformancePage() {
   const [exportOpen, setExportOpen] = useState(false)
 
   useEffect(() => { fetchOptions() }, [])
-  useEffect(() => { fetchData() }, [filters, groupBy])
+  useEffect(() => { fetchData() }, [filters, focus, groupBy])
 
   async function fetchOptions() {
     const { data } = await supabase.rpc('get_filter_options_v2')
     if (data?.[0]) setOptions(data[0] as FilterOptions)
   }
 
-  // Enforces the single global focus: whichever of the 5 entity fields just
-  // changed to a non-empty value clears the other four. Both the FilterBar
-  // (select-or-type) and clicking a table row funnel through this — they're
-  // just two input methods for the same one focus (PLAN.md Section 3).
+  function optionsFor(field: EntityField) {
+    return field === 'branch' ? options.branches :
+      field === 'item' ? options.items :
+      field === 'sales_agent' ? options.sales_agents :
+      field === 'debtor' ? options.debtors : options.creditors
+  }
+
+  // Changing the FilterBar for a dimension that currently has an active
+  // focus clears that focus — the FilterBar action is the newer one, so it
+  // wins. (The reverse — clicking a row while a FilterBar value is set for
+  // the same dimension — already wins naturally, since focus always
+  // overrides its own dimension in buildParams below.)
   function setFilters(next: Filters) {
     const changed = ENTITY_FIELDS.find((k) => next[k] !== filters[k])
-    if (changed && next[changed]) {
-      const cleared = { ...next }
-      for (const k of ENTITY_FIELDS) if (k !== changed) cleared[k] = ''
-      setFiltersState(cleared)
-    } else {
-      setFiltersState(next)
-    }
+    if (changed && focus?.field === changed) setFocus(null)
+    setFiltersState(next)
   }
 
   function toggleFocus(field: EntityField, id: string) {
-    setFilters({ ...filters, [field]: filters[field] === id ? '' : id })
+    setFocus((prev) => {
+      if (prev?.field === field && prev.id === id) return null
+      const name = optionsFor(field).find((o) => o.id === id)?.name ?? ''
+      return { field, id, name }
+    })
+  }
+
+  // FilterBar filters + focus combined — focus overrides its own dimension
+  // (it's always the more recent action for that dimension, since setFilters
+  // above already clears any stale focus when the FilterBar itself changes
+  // that same dimension).
+  function buildParams() {
+    const base = toParams(filters)
+    if (focus) {
+      const key = `p_${focus.field}` as keyof typeof base
+      base[key] = focus.id
+    }
+    return base
   }
 
   async function fetchData() {
     setLoading(true)
-    const p = toParams(filters)
+    const p = buildParams()
     const common = { p_date_from: p.p_date_from, p_date_to: p.p_date_to, p_item_group: p.p_item_group, p_item_type: p.p_item_type }
 
     const [branchRes, itemRes, agentRes, debtorRes, creditorRes] = await Promise.all([
@@ -91,20 +122,6 @@ export default function PerformancePage() {
     setLoading(false)
   }
 
-  function focusedEntity(): { field: EntityField; name: string } | null {
-    for (const field of ENTITY_FIELDS) {
-      if (!filters[field]) continue
-      const list =
-        field === 'branch' ? options.branches :
-        field === 'item' ? options.items :
-        field === 'sales_agent' ? options.sales_agents :
-        field === 'debtor' ? options.debtors : options.creditors
-      return { field, name: list.find((o) => o.id === filters[field])?.name ?? '' }
-    }
-    return null
-  }
-
-  const focus = focusedEntity()
   function titleFor(field: EntityField, base: string) {
     if (!focus || focus.field === field) return base
     return `${base} — ${focus.name}`
@@ -137,6 +154,7 @@ export default function PerformancePage() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <FilterBar filters={filters} options={options} onChange={setFilters} />
+          <GroupByToggle value={groupBy} onChange={setGroupBy} />
           <button
             onClick={() => setExportOpen(true)}
             className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
@@ -151,10 +169,7 @@ export default function PerformancePage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {sections.map((s) => (
           <div key={s.field} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900 text-sm">Top 5 {s.title}</h3>
-              {s.field === 'item' && <GroupByToggle value={groupBy} onChange={setGroupBy} />}
-            </div>
+            <h3 className="font-semibold text-gray-900 text-sm mb-4">Top 5 {s.title}</h3>
             {loading ? (
               <div className="flex items-center justify-center h-[260px]">
                 <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
@@ -174,7 +189,7 @@ export default function PerformancePage() {
             title={s.title}
             rows={s.rows}
             loading={loading}
-            focusedId={filters[s.field] || null}
+            focusedId={focus?.field === s.field ? focus.id : null}
             onRowClick={s.setRows}
           />
         ))}

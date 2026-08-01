@@ -1,6 +1,6 @@
 import { KpiSummary } from '@/types'
 import { formatMoneyLines } from '@/lib/currency'
-import { TrendingUp, Clock, AlertTriangle, Package, Receipt } from 'lucide-react'
+import { TrendingUp, Clock, AlertTriangle, Package, Receipt, Coins } from 'lucide-react'
 
 function fmtInt(n: number) {
   return new Intl.NumberFormat('en-MY').format(Math.round(n))
@@ -46,6 +46,9 @@ export default function KpiCards({ data }: { data: KpiSummary[] }) {
   const overdue = formatMoneyLines(
     [...data].sort((a, b) => b.revenue_overdue - a.revenue_overdue).map((d) => ({ currency: d.currency, amount: d.revenue_overdue }))
   )
+  const cost = formatMoneyLines(
+    [...data].sort((a, b) => b.total_cost - a.total_cost).map((d) => ({ currency: d.currency, amount: d.total_cost }))
+  )
 
   const cashQty = data.reduce((sum, d) => sum + d.cash_qty, 0)
   const creditQty = data.reduce((sum, d) => sum + d.credit_qty, 0)
@@ -53,10 +56,11 @@ export default function KpiCards({ data }: { data: KpiSummary[] }) {
   const creditTx = data.reduce((sum, d) => sum + d.credit_transactions, 0)
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
       <Card label="Revenue" value={paid} sub="Cash + Credit paid" icon={TrendingUp} color="bg-brand/10 text-brand" />
       <Card label="Outstanding" value={notDue} sub="Credit, not yet due" icon={Clock} color="bg-gray-200/60 text-gray-600" />
       <Card label="Overdue" value={overdue} sub="Credit, past due date" icon={AlertTriangle} color="bg-danger/10 text-danger" />
+      <Card label="Cost" value={cost} sub="Qty sold × item cost" icon={Coins} color="bg-sand/20 text-ink" />
       <Card
         label="Qty Sold"
         value={[`Cash ${fmtInt(cashQty)}`, `Credit ${fmtInt(creditQty)}`]}

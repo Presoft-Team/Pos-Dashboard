@@ -124,16 +124,20 @@ export default function MonthlyPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {breakdown.map((m, i) => (
-                  <tr key={i} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900">{MONTH_NAMES[m.month]} {m.year}</td>
-                    <td className="px-4 py-3 text-gray-600">{m.currency}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(m.credit_revenue)}</td>
-                    <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(m.cash_revenue)}</td>
-                    <td className="px-4 py-3 text-right text-gray-700">{m.credit_qty.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right text-gray-700">{m.cash_qty.toLocaleString()}</td>
-                  </tr>
-                ))}
+                {breakdown.map((m, i) => {
+                  const next = breakdown[i + 1]
+                  const isLastOfMonth = !next || next.year !== m.year || next.month !== m.month
+                  return (
+                    <tr key={i} className={`hover:bg-gray-50 ${isLastOfMonth ? 'border-b-2 border-gray-300' : ''}`}>
+                      <td className="px-4 py-3 font-medium text-gray-900">{MONTH_NAMES[m.month]} {m.year}</td>
+                      <td className="px-4 py-3 text-gray-600">{m.currency}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(m.credit_revenue)}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(m.cash_revenue)}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{m.credit_qty.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{m.cash_qty.toLocaleString()}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
