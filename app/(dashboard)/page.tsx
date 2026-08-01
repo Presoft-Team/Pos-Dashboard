@@ -84,15 +84,22 @@ export default function DashboardPage() {
           <p className="text-sm text-gray-500">Overview of all branches and items</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <FilterBar filters={filters} options={options} onChange={setFilters} />
-          <GroupByToggle value={groupBy} onChange={setGroupBy} />
-          <button
-            onClick={() => setExportOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
-          >
-            <Download size={15} />
-            Export
-          </button>
+          <FilterBar
+            filters={filters}
+            options={options}
+            onChange={setFilters}
+            trailing={[
+              <GroupByToggle key="toggle" value={groupBy} onChange={setGroupBy} />,
+              <button
+                key="export"
+                onClick={() => setExportOpen(true)}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors whitespace-nowrap w-full sm:w-auto"
+              >
+                <Download size={15} />
+                Export
+              </button>,
+            ]}
+          />
         </div>
       </div>
 
