@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { FilterOptions, Filters, MonthlyBreakdownRow, MonthlyTrendRow } from '@/types'
+import { FilterOptions, Filters, GroupByMode, MonthlyBreakdownRow, MonthlyTrendRow } from '@/types'
 import { DEFAULT_FILTERS, DEFAULT_OPTIONS, toParams } from '@/lib/filters'
 import { formatAmount, pivotMonthlyTrend } from '@/lib/currency'
 import { ExportColumn } from '@/lib/export'
 import FilterBar from '@/components/filter-bar'
+import CurrencyFilter from '@/components/currency-filter'
 import MonthlyTrendChart from '@/components/monthly-trend-chart'
 import ExportModal, { ExportChartSpec, ExportTableSpec } from '@/components/export-modal'
 import { Download } from 'lucide-react'
@@ -27,6 +28,7 @@ export default function MonthlyPage() {
 
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
   const [options, setOptions] = useState<FilterOptions>(DEFAULT_OPTIONS)
+  const [groupBy, setGroupBy] = useState<GroupByMode>('item')
   const [trend, setTrend] = useState<MonthlyTrendRow[]>([])
   const [breakdown, setBreakdown] = useState<MonthlyBreakdownRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -34,6 +36,16 @@ export default function MonthlyPage() {
 
   useEffect(() => { fetchOptions() }, [])
   useEffect(() => { fetchData() }, [filters])
+
+  // FilterBar's Item/Group/Type slot swaps meaning with the toggle — clear
+  // whichever of the 3 fields was set so switching modes doesn't leave a
+  // stale, now-invisible filter silently narrowing results. Monthly has no
+  // p_group_by RPC param (no item-grouping here) — the toggle only decides
+  // which filter field is shown.
+  function handleGroupByChange(next: GroupByMode) {
+    setGroupBy(next)
+    setFilters((f) => ({ ...f, item: '', item_group: '', item_type: '' }))
+  }
 
   async function fetchOptions() {
     const { data } = await supabase.rpc('get_filter_options_v2')
@@ -46,7 +58,7 @@ export default function MonthlyPage() {
 
     const [trendRes, breakdownRes] = await Promise.all([
       supabase.rpc('get_monthly_trend_v2', params),
-      supabase.rpc('get_monthly_breakdown_v2', { ...params, p_limit_months: 6 }),
+      supabase.rpc('get_monthly_breakdown_v2', params),
     ])
 
     if (trendRes.error) console.error('get_monthly_trend_v2 error:', trendRes.error.message)
@@ -85,7 +97,15 @@ export default function MonthlyPage() {
             filters={filters}
             options={options}
             onChange={setFilters}
+            groupBy={groupBy}
+            onGroupByChange={handleGroupByChange}
             trailing={[
+              <CurrencyFilter
+                key="currency"
+                value={filters.currency}
+                options={options.currencies}
+                onChange={(v) => setFilters({ ...filters, currency: v })}
+              />,
               <button
                 key="export"
                 onClick={() => setExportOpen(true)}
@@ -116,7 +136,6 @@ export default function MonthlyPage() {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100">
             <h3 className="font-semibold text-gray-900 text-sm">Monthly Breakdown</h3>
-            <p className="text-xs text-gray-400">Latest 6 months</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

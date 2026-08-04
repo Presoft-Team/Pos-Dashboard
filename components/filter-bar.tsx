@@ -1,25 +1,35 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { FilterOptions, Filters } from '@/types'
+import { FilterOptions, Filters, GroupByMode } from '@/types'
+import Combobox from '@/components/combobox'
+import GroupByToggle from '@/components/group-by-toggle'
 
 interface Props {
   filters: Filters
   options: FilterOptions
   onChange: (f: Filters) => void
-  // Each element is one "slot" (e.g. the Group/Type toggle, the Export
-  // button). On mobile they share the last row with Item Type, one slot per
-  // column; on desktop they render inline after the filters, same place
-  // they used to sit as the page's own siblings.
+  // Which of Item/Group/Type is active — decides whether the one dynamic
+  // combobox filters by item, item group, or item type. Pages without a
+  // Group By toggle (e.g. Monthly) can omit this; it defaults to 'item'.
+  groupBy?: GroupByMode
+  // Renders the Item/Group/Type toggle immediately to the left of the
+  // dynamic combobox (toggle → filter, reading left to right) when
+  // provided. Omit on pages with no Group By concept.
+  onGroupByChange?: (mode: GroupByMode) => void
+  // Each element is one "slot" (e.g. the Export button). On mobile they
+  // share the last row with Creditor (or the Item/Group/Type field, if
+  // there's no toggle), one slot per column; on desktop they render inline
+  // after the filters, same place they used to sit as the page's own
+  // siblings.
   trailing?: ReactNode[]
 }
 
 // Global FilterBar (PLAN.md Section 3) — shared by Sales Dashboard, Monthly
 // Sales, Performance, and Item pages. Date range + 5 entity fields (Branch,
-// Item, Sales Agent, Debtor, Creditor) + Item Group/Item Type. Each entity
-// field is a native <select> — browsers already support jumping to an
-// option by typing its first letters, covering "select or type" without a
-// custom combobox.
+// Item, Sales Agent, Debtor, Creditor) + Item Group/Item Type. Every field
+// except date range is a Combobox — click for the full list (same as a
+// plain <select>), or type to live-filter it by name.
 //
 // Two separate layouts, not one responsive one: mobile groups fields into
 // fixed-width rows (2 filters per row, 3 in the last with `trailing`) so
@@ -29,13 +39,11 @@ interface Props {
 // rendering the fields twice. `w-full sm:w-auto` on each field is what lets
 // the same element fill its mobile row slot but stay intrinsic-width on
 // desktop.
-export default function FilterBar({ filters, options, onChange, trailing = [] }: Props) {
+export default function FilterBar({ filters, options, onChange, groupBy = 'item', onGroupByChange, trailing = [] }: Props) {
   function set(key: keyof Filters, value: string) {
     onChange({ ...filters, [key]: value })
   }
 
-  const selectClass =
-    'h-9 min-w-0 w-full sm:w-auto pl-3 pr-8 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent'
   const dateClass =
     'h-9 min-w-0 w-full sm:w-auto pl-3 pr-2 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent'
 
@@ -54,46 +62,41 @@ export default function FilterBar({ filters, options, onChange, trailing = [] }:
     />
   )
   const branch = (
-    <select value={filters.branch} onChange={(e) => set('branch', e.target.value)} className={selectClass} aria-label="Branch">
-      <option value="">All Branches</option>
-      {options.branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-    </select>
+    <Combobox value={filters.branch} onChange={(v) => set('branch', v)} options={options.branches} placeholder="All Branches" ariaLabel="Branch" />
   )
-  const item = (
-    <select value={filters.item} onChange={(e) => set('item', e.target.value)} className={selectClass} aria-label="Item">
-      <option value="">All Items</option>
-      {options.items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-    </select>
-  )
+  // One slot whose meaning follows the active Group By mode — Item, Item
+  // Group, or Item Type — instead of showing all three at once.
+  const itemDynamic =
+    groupBy === 'group' ? (
+      <Combobox
+        value={filters.item_group}
+        onChange={(v) => set('item_group', v)}
+        options={options.item_groups.map((g) => ({ id: g, name: g }))}
+        placeholder="All Item Groups"
+        ariaLabel="Item Group"
+      />
+    ) : groupBy === 'type' ? (
+      <Combobox
+        value={filters.item_type}
+        onChange={(v) => set('item_type', v)}
+        options={options.item_types.map((t) => ({ id: t, name: t }))}
+        placeholder="All Item Types"
+        ariaLabel="Item Type"
+      />
+    ) : (
+      <Combobox value={filters.item} onChange={(v) => set('item', v)} options={options.items} placeholder="All Items" ariaLabel="Item" />
+    )
+  // Sits immediately left of itemDynamic wherever it renders — toggle,
+  // then the field it controls, reading left to right.
+  const toggle = onGroupByChange ? <GroupByToggle value={groupBy} onChange={onGroupByChange} /> : null
   const salesAgent = (
-    <select value={filters.sales_agent} onChange={(e) => set('sales_agent', e.target.value)} className={selectClass} aria-label="Sales Agent">
-      <option value="">All Sales Agents</option>
-      {options.sales_agents.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-    </select>
+    <Combobox value={filters.sales_agent} onChange={(v) => set('sales_agent', v)} options={options.sales_agents} placeholder="All Sales Agents" ariaLabel="Sales Agent" />
   )
   const debtor = (
-    <select value={filters.debtor} onChange={(e) => set('debtor', e.target.value)} className={selectClass} aria-label="Debtor">
-      <option value="">All Debtors</option>
-      {options.debtors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-    </select>
+    <Combobox value={filters.debtor} onChange={(v) => set('debtor', v)} options={options.debtors} placeholder="All Debtors" ariaLabel="Debtor" />
   )
   const creditor = (
-    <select value={filters.creditor} onChange={(e) => set('creditor', e.target.value)} className={selectClass} aria-label="Creditor">
-      <option value="">All Creditors</option>
-      {options.creditors.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-    </select>
-  )
-  const itemGroup = (
-    <select value={filters.item_group} onChange={(e) => set('item_group', e.target.value)} className={selectClass} aria-label="Item Group">
-      <option value="">All Item Groups</option>
-      {options.item_groups.map((g) => <option key={g} value={g}>{g}</option>)}
-    </select>
-  )
-  const itemType = (
-    <select value={filters.item_type} onChange={(e) => set('item_type', e.target.value)} className={selectClass} aria-label="Item Type">
-      <option value="">All Item Types</option>
-      {options.item_types.map((t) => <option key={t} value={t}>{t}</option>)}
-    </select>
+    <Combobox value={filters.creditor} onChange={(v) => set('creditor', v)} options={options.creditors} placeholder="All Creditors" ariaLabel="Creditor" />
   )
 
   return (
@@ -107,22 +110,26 @@ export default function FilterBar({ filters, options, onChange, trailing = [] }:
         </div>
         <div className="flex gap-2">
           <div className="flex-1 min-w-0">{branch}</div>
-          <div className="flex-1 min-w-0">{item}</div>
-        </div>
-        <div className="flex gap-2">
           <div className="flex-1 min-w-0">{salesAgent}</div>
-          <div className="flex-1 min-w-0">{debtor}</div>
         </div>
         <div className="flex gap-2">
+          <div className="flex-1 min-w-0">{debtor}</div>
           <div className="flex-1 min-w-0">{creditor}</div>
-          <div className="flex-1 min-w-0">{itemGroup}</div>
         </div>
+        {/* Toggle sits left of the field it controls — paired together so
+            the relationship is visually obvious. */}
+        {toggle && (
+          <div className="flex gap-2">
+            <div className="flex-1 min-w-0">{toggle}</div>
+            <div className="flex-1 min-w-0">{itemDynamic}</div>
+          </div>
+        )}
         {/* auto-fit lets this row hold 3 equal columns when there's room, but
             drop to 2-then-1 per row as the screen narrows, instead of forcing
-            a fixed 33% that would squeeze the toggle's "Item/Group/Type"
-            labels into truncation. */}
+            a fixed 33% that would squeeze labels into truncation. Only
+            carries itemDynamic itself when there's no toggle to pair it with. */}
         <div className="grid grid-cols-[repeat(auto-fit,minmax(175px,1fr))] gap-2">
-          <div className="min-w-0">{itemType}</div>
+          {!toggle && <div className="min-w-0">{itemDynamic}</div>}
           {trailing.map((node, i) => <div key={i} className="min-w-0">{node}</div>)}
         </div>
       </div>
@@ -133,12 +140,11 @@ export default function FilterBar({ filters, options, onChange, trailing = [] }:
         <span className="text-gray-400 text-sm">–</span>
         {dateTo}
         {branch}
-        {item}
+        {toggle}
+        {itemDynamic}
         {salesAgent}
         {debtor}
         {creditor}
-        {itemGroup}
-        {itemType}
         {trailing.map((node, i) => <span key={i} className="contents">{node}</span>)}
       </div>
     </>

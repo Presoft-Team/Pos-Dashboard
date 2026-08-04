@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { PerformanceRow } from '@/types'
 import { formatAmount } from '@/lib/currency'
 
@@ -7,16 +8,24 @@ interface Props {
   title: string
   rows: PerformanceRow[]
   loading?: boolean
-  focusedId?: string | null   // this dimension's own focused row, if any
-  onRowClick: (id: string) => void
 }
 
+const INITIAL_VISIBLE = 5
+const SHOW_MORE_STEP = 5
+
 // One of Performance's 5 breakdown tables (Branch/Item/Sales Agent/Debtor/
-// Creditor) — see PLAN.md Section 6. Clicking a row reports it up to the
-// page, which owns the single global focus and re-fetches the other 4.
-// Rows with a null id (Item table grouped by Group/Type) aren't clickable —
-// a group/type aggregate isn't one focusable entity.
-export default function PerformanceTable({ title, rows, loading, focusedId, onRowClick }: Props) {
+// Creditor) — plain display, filtered only by the Global FilterBar above
+// (click-to-focus was removed).
+export default function PerformanceTable({ title, rows, loading }: Props) {
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
+
+  // Reset expansion when the underlying rows change (new filters/data).
+  useEffect(() => { setVisibleCount(INITIAL_VISIBLE) }, [rows])
+
+  const visibleRows = rows.slice(0, visibleCount)
+  const hasMore = visibleCount < rows.length
+  const isExpanded = visibleCount > INITIAL_VISIBLE
+
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-gray-100">
@@ -44,12 +53,8 @@ export default function PerformanceTable({ title, rows, loading, focusedId, onRo
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {rows.map((row, i) => (
-                <tr
-                  key={i}
-                  onClick={() => row.id && onRowClick(row.id)}
-                  className={`transition-colors ${row.id ? 'hover:bg-gray-50 cursor-pointer' : ''} ${focusedId && focusedId === row.id ? 'bg-brand/10' : ''}`}
-                >
+              {visibleRows.map((row, i) => (
+                <tr key={i}>
                   <td className="px-4 py-3 text-gray-400 font-medium">{i + 1}</td>
                   <td className="px-4 py-3 font-semibold text-gray-900">{row.name}</td>
                   <td className="px-4 py-3 text-gray-600">{row.currency}</td>
@@ -61,6 +66,35 @@ export default function PerformanceTable({ title, rows, loading, focusedId, onRo
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {!loading && (hasMore || isExpanded) && (
+        <div className="flex items-center justify-center gap-3 px-5 py-3 border-t border-gray-100">
+          {hasMore && (
+            <button
+              onClick={() => setVisibleCount((c) => Math.min(c + SHOW_MORE_STEP, rows.length))}
+              className="text-sm font-medium text-brand hover:text-brand/80 transition-colors"
+            >
+              Show 5 more
+            </button>
+          )}
+          {hasMore && (
+            <button
+              onClick={() => setVisibleCount(rows.length)}
+              className="text-sm font-medium text-brand hover:text-brand/80 transition-colors"
+            >
+              Show all
+            </button>
+          )}
+          {isExpanded && (
+            <button
+              onClick={() => setVisibleCount(INITIAL_VISIBLE)}
+              className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              Show less
+            </button>
+          )}
         </div>
       )}
     </div>

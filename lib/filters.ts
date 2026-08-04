@@ -3,12 +3,12 @@ import { Filters, FilterOptions } from '@/types'
 export const DEFAULT_FILTERS: Filters = {
   date_from: '', date_to: '',
   branch: '', item: '', sales_agent: '', debtor: '', creditor: '',
-  item_group: '', item_type: '',
+  item_group: '', item_type: '', currency: '',
 }
 
 export const DEFAULT_OPTIONS: FilterOptions = {
   branches: [], items: [], sales_agents: [], debtors: [], creditors: [],
-  item_groups: [], item_types: [],
+  item_groups: [], item_types: [], currencies: [],
   date_min: null, date_max: null,
 }
 
@@ -26,5 +26,6 @@ export function toParams(filters: Filters) {
     p_creditor:     filters.creditor || null,
     p_item_group:   filters.item_group || null,
     p_item_type:    filters.item_type || null,
+    p_currency:     filters.currency || null,
   }
 }

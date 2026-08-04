@@ -7,7 +7,7 @@ import { DEFAULT_FILTERS, DEFAULT_OPTIONS, toParams } from '@/lib/filters'
 import { pivotRevenueByCurrency } from '@/lib/currency'
 import { entityRevenueColumns } from '@/lib/export'
 import FilterBar from '@/components/filter-bar'
-import GroupByToggle from '@/components/group-by-toggle'
+import CurrencyFilter from '@/components/currency-filter'
 import BarChartWidget from '@/components/bar-chart'
 import PerformanceTable from '@/components/performance-table'
 import ExportModal, { ExportChartSpec, ExportTableSpec } from '@/components/export-modal'
@@ -18,28 +18,20 @@ type EntityField = (typeof ENTITY_FIELDS)[number]
 
 const GROUP_LABEL: Record<GroupByMode, string> = { item: 'Item', group: 'Group', type: 'Type' }
 
-interface Focus {
-  field: EntityField
-  id: string
-  name: string
-}
+const CHART_LIMIT = 5
 
 function chartData(rows: PerformanceRow[]) {
   return pivotRevenueByCurrency(
     rows.map((r) => ({ ...r, total_revenue: r.credit_revenue + r.cash_revenue, total_qty: r.credit_qty + r.cash_qty })),
-    (r) => r.name
+    (r) => r.name,
+    CHART_LIMIT
   )
 }
 
 export default function PerformancePage() {
   const supabase = createClient()
 
-  // FilterBar's 5 entity fields are independent filters, just like Date
-  // Range — all can be set at once. `focus` is a separate, click-only
-  // selection (still just one at a time) that layers on top of whatever
-  // filters are active.
-  const [filters, setFiltersState] = useState<Filters>(DEFAULT_FILTERS)
-  const [focus, setFocus] = useState<Focus | null>(null)
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
   const [options, setOptions] = useState<FilterOptions>(DEFAULT_OPTIONS)
   const [groupBy, setGroupBy] = useState<GroupByMode>('item')
   const [branchRows, setBranchRows] = useState<PerformanceRow[]>([])
@@ -51,63 +43,37 @@ export default function PerformancePage() {
   const [exportOpen, setExportOpen] = useState(false)
 
   useEffect(() => { fetchOptions() }, [])
-  useEffect(() => { fetchData() }, [filters, focus, groupBy])
+  useEffect(() => { fetchData() }, [filters, groupBy])
+
+  // FilterBar's Item/Group/Type slot swaps meaning with the toggle — clear
+  // whichever of the 3 fields was set so switching modes doesn't leave a
+  // stale, now-invisible filter silently narrowing results.
+  function handleGroupByChange(next: GroupByMode) {
+    setGroupBy(next)
+    setFilters((f) => ({ ...f, item: '', item_group: '', item_type: '' }))
+  }
 
   async function fetchOptions() {
     const { data } = await supabase.rpc('get_filter_options_v2')
     if (data?.[0]) setOptions(data[0] as FilterOptions)
   }
 
-  function optionsFor(field: EntityField) {
-    return field === 'branch' ? options.branches :
-      field === 'item' ? options.items :
-      field === 'sales_agent' ? options.sales_agents :
-      field === 'debtor' ? options.debtors : options.creditors
-  }
-
-  // Changing the FilterBar for a dimension that currently has an active
-  // focus clears that focus — the FilterBar action is the newer one, so it
-  // wins. (The reverse — clicking a row while a FilterBar value is set for
-  // the same dimension — already wins naturally, since focus always
-  // overrides its own dimension in buildParams below.)
-  function setFilters(next: Filters) {
-    const changed = ENTITY_FIELDS.find((k) => next[k] !== filters[k])
-    if (changed && focus?.field === changed) setFocus(null)
-    setFiltersState(next)
-  }
-
-  function toggleFocus(field: EntityField, id: string) {
-    setFocus((prev) => {
-      if (prev?.field === field && prev.id === id) return null
-      const name = optionsFor(field).find((o) => o.id === id)?.name ?? ''
-      return { field, id, name }
-    })
-  }
-
-  // FilterBar filters + focus combined — focus overrides its own dimension
-  // (it's always the more recent action for that dimension, since setFilters
-  // above already clears any stale focus when the FilterBar itself changes
-  // that same dimension).
-  function buildParams() {
-    const base = toParams(filters)
-    if (focus) {
-      const key = `p_${focus.field}` as keyof typeof base
-      base[key] = focus.id
-    }
-    return base
-  }
-
   async function fetchData() {
     setLoading(true)
-    const p = buildParams()
-    const common = { p_date_from: p.p_date_from, p_date_to: p.p_date_to, p_item_group: p.p_item_group, p_item_type: p.p_item_type }
+    // All 5 functions now accept every entity filter, including their own
+    // dimension — filtering by "Ah Chong" collapses the Sales Agent table
+    // to just his row too, not only the other 4.
+    // p_limit defaults to 5 server-side (it feeds the "Top 5" chart) — the
+    // breakdown tables need the full set, so pass null (= no LIMIT) here and
+    // let chartData() above re-slice down to 5 for the chart only.
+    const p = { ...toParams(filters), p_limit: null }
 
     const [branchRes, itemRes, agentRes, debtorRes, creditorRes] = await Promise.all([
-      supabase.rpc('get_performance_branch_v2', { ...common, p_item: p.p_item, p_sales_agent: p.p_sales_agent, p_debtor: p.p_debtor, p_creditor: p.p_creditor }),
-      supabase.rpc('get_performance_item_v2', { ...common, p_branch: p.p_branch, p_sales_agent: p.p_sales_agent, p_debtor: p.p_debtor, p_creditor: p.p_creditor, p_group_by: groupBy }),
-      supabase.rpc('get_performance_sales_agent_v2', { ...common, p_branch: p.p_branch, p_item: p.p_item, p_debtor: p.p_debtor, p_creditor: p.p_creditor }),
-      supabase.rpc('get_performance_debtor_v2', { ...common, p_branch: p.p_branch, p_item: p.p_item, p_sales_agent: p.p_sales_agent, p_creditor: p.p_creditor }),
-      supabase.rpc('get_performance_creditor_v2', { ...common, p_branch: p.p_branch, p_item: p.p_item, p_sales_agent: p.p_sales_agent, p_debtor: p.p_debtor }),
+      supabase.rpc('get_performance_branch_v2', p),
+      supabase.rpc('get_performance_item_v2', { ...p, p_group_by: groupBy }),
+      supabase.rpc('get_performance_sales_agent_v2', p),
+      supabase.rpc('get_performance_debtor_v2', p),
+      supabase.rpc('get_performance_creditor_v2', p),
     ])
 
     for (const [label, res] of [['branch', branchRes], ['item', itemRes], ['sales_agent', agentRes], ['debtor', debtorRes], ['creditor', creditorRes]] as const) {
@@ -122,18 +88,13 @@ export default function PerformancePage() {
     setLoading(false)
   }
 
-  function titleFor(field: EntityField, base: string) {
-    if (!focus || focus.field === field) return base
-    return `${base} — ${focus.name}`
-  }
-
   const itemLabel = GROUP_LABEL[groupBy]
-  const sections: { field: EntityField; title: string; rows: PerformanceRow[]; setRows: (id: string) => void }[] = [
-    { field: 'branch', title: titleFor('branch', 'Branch Breakdown'), rows: branchRows, setRows: (id) => toggleFocus('branch', id) },
-    { field: 'item', title: titleFor('item', `${itemLabel} Breakdown`), rows: itemRows, setRows: (id) => toggleFocus('item', id) },
-    { field: 'sales_agent', title: titleFor('sales_agent', 'Sales Agent Breakdown'), rows: agentRows, setRows: (id) => toggleFocus('sales_agent', id) },
-    { field: 'debtor', title: titleFor('debtor', 'Debtor Breakdown'), rows: debtorRows, setRows: (id) => toggleFocus('debtor', id) },
-    { field: 'creditor', title: titleFor('creditor', 'Creditor Breakdown'), rows: creditorRows, setRows: (id) => toggleFocus('creditor', id) },
+  const sections: { field: EntityField; title: string; rows: PerformanceRow[] }[] = [
+    { field: 'item', title: `${itemLabel} Breakdown`, rows: itemRows },
+    { field: 'branch', title: 'Branch Breakdown', rows: branchRows },
+    { field: 'sales_agent', title: 'Sales Agent Breakdown', rows: agentRows },
+    { field: 'debtor', title: 'Debtor Breakdown', rows: debtorRows },
+    { field: 'creditor', title: 'Creditor Breakdown', rows: creditorRows },
   ]
 
   const exportCharts: ExportChartSpec[] = sections.map((s) => ({
@@ -157,8 +118,15 @@ export default function PerformancePage() {
             filters={filters}
             options={options}
             onChange={setFilters}
+            groupBy={groupBy}
+            onGroupByChange={handleGroupByChange}
             trailing={[
-              <GroupByToggle key="toggle" value={groupBy} onChange={setGroupBy} />,
+              <CurrencyFilter
+                key="currency"
+                value={filters.currency}
+                options={options.currencies}
+                onChange={(v) => setFilters({ ...filters, currency: v })}
+              />,
               <button
                 key="export"
                 onClick={() => setExportOpen(true)}
@@ -191,14 +159,7 @@ export default function PerformancePage() {
       {/* Tables */}
       <div className="space-y-4">
         {sections.map((s) => (
-          <PerformanceTable
-            key={s.field}
-            title={s.title}
-            rows={s.rows}
-            loading={loading}
-            focusedId={focus?.field === s.field ? focus.id : null}
-            onRowClick={s.setRows}
-          />
+          <PerformanceTable key={s.field} title={s.title} rows={s.rows} loading={loading} />
         ))}
       </div>
 

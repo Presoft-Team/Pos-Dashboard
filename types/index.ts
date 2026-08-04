@@ -13,6 +13,7 @@ export interface FilterOptions {
   creditors: EntityOption[]
   item_groups: string[]
   item_types: string[]
+  currencies: string[]
   date_min: string | null
   date_max: string | null
 }
@@ -29,6 +30,7 @@ export interface Filters {
   creditor: string
   item_group: string
   item_type: string
+  currency: string
 }
 
 export type GroupByMode = 'item' | 'group' | 'type'

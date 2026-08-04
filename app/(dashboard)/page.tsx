@@ -8,7 +8,7 @@ import { pivotItemRevenue } from '@/lib/currency'
 import KpiCards from '@/components/kpi-cards'
 import BestSellersTable from '@/components/best-sellers-table'
 import FilterBar from '@/components/filter-bar'
-import GroupByToggle from '@/components/group-by-toggle'
+import CurrencyFilter from '@/components/currency-filter'
 import StackedBarChartWidget from '@/components/stacked-bar-chart'
 import ExportModal, { ExportChartSpec, ExportTableSpec } from '@/components/export-modal'
 import { entityRevenueColumns } from '@/lib/export'
@@ -30,6 +30,14 @@ export default function DashboardPage() {
 
   useEffect(() => { fetchOptions() }, [])
   useEffect(() => { fetchData() }, [filters, groupBy])
+
+  // FilterBar's Item/Group/Type slot swaps meaning with the toggle — clear
+  // whichever of the 3 fields was set so switching modes doesn't leave a
+  // stale, now-invisible filter silently narrowing results.
+  function handleGroupByChange(next: GroupByMode) {
+    setGroupBy(next)
+    setFilters((f) => ({ ...f, item: '', item_group: '', item_type: '' }))
+  }
 
   async function fetchOptions() {
     const { data, error } = await supabase.rpc('get_filter_options_v2')
@@ -88,8 +96,15 @@ export default function DashboardPage() {
             filters={filters}
             options={options}
             onChange={setFilters}
+            groupBy={groupBy}
+            onGroupByChange={handleGroupByChange}
             trailing={[
-              <GroupByToggle key="toggle" value={groupBy} onChange={setGroupBy} />,
+              <CurrencyFilter
+                key="currency"
+                value={filters.currency}
+                options={options.currencies}
+                onChange={(v) => setFilters({ ...filters, currency: v })}
+              />,
               <button
                 key="export"
                 onClick={() => setExportOpen(true)}
