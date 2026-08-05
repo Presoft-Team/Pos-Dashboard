@@ -1,6 +1,6 @@
 import { KpiSummary } from '@/types'
 import { formatMoneyLines } from '@/lib/currency'
-import { TrendingUp, Clock, AlertTriangle, Package, Receipt, Coins } from 'lucide-react'
+import { Wallet, TrendingUp, Clock, AlertTriangle, Receipt, Coins } from 'lucide-react'
 
 function fmtInt(n: number) {
   return new Intl.NumberFormat('en-MY').format(Math.round(n))
@@ -34,9 +34,16 @@ function Card({ label, value, sub, icon: Icon, color }: CardProps) {
 }
 
 // Revenue: 3 buckets (Paid, Not-due, Overdue), each per-currency.
-// Qty/Transactions: 2 buckets (Cash, Credit), summed across currency since
+// Transactions: 2 buckets (Cash, Credit), summed across currency since
 // unit counts aren't currency-denominated. See PLAN.md Section 4.
 export default function KpiCards({ data }: { data: KpiSummary[] }) {
+  // Paid (cash + credit-paid) + not-yet-due credit — everything except
+  // overdue, i.e. revenue that's either in hand or still expected on time.
+  const total = formatMoneyLines(
+    [...data]
+      .map((d) => ({ currency: d.currency, amount: d.revenue_paid + d.revenue_not_due }))
+      .sort((a, b) => b.amount - a.amount)
+  )
   const paid = formatMoneyLines(
     [...data].sort((a, b) => b.revenue_paid - a.revenue_paid).map((d) => ({ currency: d.currency, amount: d.revenue_paid }))
   )
@@ -50,23 +57,16 @@ export default function KpiCards({ data }: { data: KpiSummary[] }) {
     [...data].sort((a, b) => b.total_cost - a.total_cost).map((d) => ({ currency: d.currency, amount: d.total_cost }))
   )
 
-  const cashQty = data.reduce((sum, d) => sum + d.cash_qty, 0)
-  const creditQty = data.reduce((sum, d) => sum + d.credit_qty, 0)
   const cashTx = data.reduce((sum, d) => sum + d.cash_transactions, 0)
   const creditTx = data.reduce((sum, d) => sum + d.credit_transactions, 0)
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+      <Card label="Total Revenue" value={total} sub="Paid + not yet due" icon={Wallet} color="bg-mint/10 text-mint" />
       <Card label="Revenue" value={paid} sub="Cash + Credit paid" icon={TrendingUp} color="bg-brand/10 text-brand" />
       <Card label="Outstanding" value={notDue} sub="Credit, not yet due" icon={Clock} color="bg-gray-200/60 text-gray-600" />
       <Card label="Overdue" value={overdue} sub="Credit, past due date" icon={AlertTriangle} color="bg-danger/10 text-danger" />
       <Card label="Cost" value={cost} sub="Qty sold × item cost" icon={Coins} color="bg-sand/20 text-ink" />
-      <Card
-        label="Qty Sold"
-        value={[`Cash ${fmtInt(cashQty)}`, `Credit ${fmtInt(creditQty)}`]}
-        icon={Package}
-        color="bg-mint/10 text-mint"
-      />
       <Card
         label="Transactions"
         value={[`Cash ${fmtInt(cashTx)}`, `Credit ${fmtInt(creditTx)}`]}

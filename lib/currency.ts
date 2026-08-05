@@ -17,23 +17,6 @@ export const CURRENCIES: CurrencyDef[] = [
 
 export const DEFAULT_CURRENCY = 'MYR'
 
-// Recognized tokens (header words, cell values, symbols) mapped to a currency code.
-export const CURRENCY_TOKENS: Record<string, string> = {
-  MYR: 'MYR', RM: 'MYR', RINGGIT: 'MYR',
-  USD: 'USD', 'US$': 'USD', USDOLLAR: 'USD',
-  SGD: 'SGD', 'S$': 'SGD',
-  EUR: 'EUR', EURO: 'EUR',
-  GBP: 'GBP',
-  CNY: 'CNY', RMB: 'CNY',
-  IDR: 'IDR', RP: 'IDR',
-  THB: 'THB',
-}
-
-export function tokenToCurrency(raw: string): string | null {
-  const key = raw.trim().toUpperCase().replace(/\s+/g, '')
-  return CURRENCY_TOKENS[key] ?? null
-}
-
 export function currencySymbol(code: string | null | undefined): string {
   return CURRENCIES.find((c) => c.code === code)?.symbol ?? code ?? CURRENCIES[0].symbol
 }

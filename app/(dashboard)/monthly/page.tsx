@@ -145,8 +145,7 @@ export default function MonthlyPage() {
                   <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Currency</th>
                   <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Credit Revenue</th>
                   <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Cash Revenue</th>
-                  <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Credit Qty</th>
-                  <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Cash Qty</th>
+                  <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Total</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -159,8 +158,7 @@ export default function MonthlyPage() {
                       <td className="px-4 py-3 text-gray-600">{m.currency}</td>
                       <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(m.credit_revenue)}</td>
                       <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(m.cash_revenue)}</td>
-                      <td className="px-4 py-3 text-right text-gray-700">{m.credit_qty.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right text-gray-700">{m.cash_qty.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(m.credit_revenue + m.cash_revenue)}</td>
                     </tr>
                   )
                 })}

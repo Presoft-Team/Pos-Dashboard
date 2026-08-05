@@ -35,8 +35,6 @@ export interface Filters {
 
 export type GroupByMode = 'item' | 'group' | 'type'
 
-export type PerformanceDimension = 'branch' | 'item' | 'sales_agent' | 'debtor' | 'creditor'
-
 // --- Sales Dashboard ---------------------------------------------------
 
 export interface KpiSummary {
@@ -45,8 +43,6 @@ export interface KpiSummary {
   revenue_not_due: number   // Credit, unpaid, not due
   revenue_overdue: number   // Credit, unpaid, overdue
   total_cost: number        // quantity * items.cost, all sales combined
-  cash_qty: number
-  credit_qty: number
   cash_transactions: number
   credit_transactions: number
 }
@@ -102,10 +98,7 @@ export interface MonthlyBreakdownRow {
 
 // Shared row shape across all 5 dimensions (Branch/Item/Sales Agent/
 // Debtor/Creditor) — `name` is whichever entity that table represents.
-// `id` is null when grouped by Item Group/Item Type (no single entity id
-// applies), in which case that row isn't click-to-focusable.
 export interface PerformanceRow {
-  id: string | null
   name: string
   currency: string
   credit_qty: number

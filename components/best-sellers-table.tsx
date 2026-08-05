@@ -34,10 +34,9 @@ export default function BestSellersTable({ data, loading, title = 'Best Sellers'
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide w-8">#</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Item</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Currency</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Credit Qty</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Cash Qty</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Credit Revenue</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Cash Revenue</th>
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Total</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -46,10 +45,9 @@ export default function BestSellersTable({ data, loading, title = 'Best Sellers'
                   <td className="px-4 py-3 text-gray-400 font-medium">{i + 1}</td>
                   <td className="px-4 py-3 font-medium text-gray-900">{row.bucket_name || '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{row.currency}</td>
-                  <td className="px-4 py-3 text-right text-gray-700">{new Intl.NumberFormat('en-MY').format(row.credit_qty)}</td>
-                  <td className="px-4 py-3 text-right text-gray-700">{new Intl.NumberFormat('en-MY').format(row.cash_qty)}</td>
                   <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(row.credit_revenue)}</td>
                   <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(row.cash_revenue)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(row.credit_revenue + row.cash_revenue)}</td>
                 </tr>
               ))}
             </tbody>
