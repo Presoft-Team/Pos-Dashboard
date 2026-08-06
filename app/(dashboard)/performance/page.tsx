@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/db/client'
 import { FilterOptions, Filters, GroupByMode, PerformanceRow } from '@/types'
 import { DEFAULT_FILTERS, DEFAULT_OPTIONS, toParams } from '@/lib/filters'
 import { pivotRevenueByCurrency } from '@/lib/currency'

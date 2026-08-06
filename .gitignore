@@ -5,6 +5,9 @@ node_modules/
 .next/
 out/
 
+# presoft-api build output
+dist/
+
 # environment variables
 .env
 .env.local

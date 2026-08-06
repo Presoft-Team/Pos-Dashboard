@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Search } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/db/client'
 import { FilterOptions, Filters, GroupByMode, ItemCatalogRow } from '@/types'
 import { DEFAULT_FILTERS, DEFAULT_OPTIONS } from '@/lib/filters'
 import { formatAmount } from '@/lib/currency'
