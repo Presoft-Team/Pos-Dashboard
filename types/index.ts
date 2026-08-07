@@ -10,7 +10,6 @@ export interface FilterOptions {
   items: EntityOption[]
   sales_agents: EntityOption[]
   debtors: EntityOption[]
-  creditors: EntityOption[]
   item_groups: string[]
   item_types: string[]
   currencies: string[]
@@ -27,7 +26,6 @@ export interface Filters {
   item: string
   sales_agent: string
   debtor: string
-  creditor: string
   item_group: string
   item_type: string
   currency: string
@@ -39,25 +37,22 @@ export type GroupByMode = 'item' | 'group' | 'type'
 
 export interface KpiSummary {
   currency: string
-  revenue_paid: number      // Cash + Credit-Paid
-  revenue_not_due: number   // Credit, unpaid, not due
-  revenue_overdue: number   // Credit, unpaid, overdue
-  total_cost: number        // quantity * items.cost, all sales combined
-  cash_transactions: number
-  credit_transactions: number
+  cash_revenue: number
+  credit_revenue: number
+  total_revenue: number     // cash_revenue + credit_revenue
+  total_purchase: number    // actual PI/PIDTL purchase spend, same filters
 }
 
 // One row per (bucket, currency) — bucket is an item name, an item group,
-// or an item type, depending on the active GroupByMode.
+// or an item type, depending on the active GroupByMode. Total value only
+// (Cash/Credit split, same shape as ItemBestSellerRow below).
 export interface ItemRevenueRow {
   bucket_name: string
   currency: string
-  revenue_paid: number
-  revenue_not_due: number
-  revenue_overdue: number
-  qty_paid: number
-  qty_not_due: number
-  qty_overdue: number
+  credit_qty: number
+  cash_qty: number
+  credit_revenue: number
+  cash_revenue: number
 }
 
 // Best Sellers table row — Cash/Credit split (not the chart's
@@ -78,10 +73,8 @@ export interface MonthlyTrendRow {
   year: number
   month: number
   currency: string
-  total_revenue: number
-  revenue_paid: number
-  revenue_not_due: number
-  revenue_overdue: number
+  cash_revenue: number
+  credit_revenue: number
 }
 
 export interface MonthlyBreakdownRow {
@@ -96,8 +89,8 @@ export interface MonthlyBreakdownRow {
 
 // --- Performance page ------------------------------------------------
 
-// Shared row shape across all 5 dimensions (Branch/Item/Sales Agent/
-// Debtor/Creditor) — `name` is whichever entity that table represents.
+// Shared row shape across all 4 dimensions (Branch/Item/Sales Agent/
+// Debtor) — `name` is whichever entity that table represents.
 export interface PerformanceRow {
   name: string
   currency: string
@@ -119,5 +112,18 @@ export interface ItemCatalogRow {
   qty_on_hand: number
   cost: number
   unit_price: number
-  qty_sold: number
+}
+
+// --- /test page (ad-hoc verification, not part of rpc_v2) ---------------
+
+export interface CreditPaidInvoiceRow {
+  doc_no: string
+  order_date: string
+  debtor_id: string
+  branch_id: string
+  sales_agent_id: string
+  currency: string
+  due_date: string | null
+  outstanding: number
+  revenue: number
 }

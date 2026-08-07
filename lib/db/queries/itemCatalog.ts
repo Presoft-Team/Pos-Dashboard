@@ -1,7 +1,11 @@
 // Real equivalent of rpc_v2.sql's get_item_catalog_v2() — Item page.
 // p_search: matches item_code or description. NULL -> default browse mode,
-// ranked by qty sold, limited to p_limit (6 per PLAN.md §2). Non-NULL ->
-// lookup mode, same fields, no ranking/limit.
+// ranked by p_sort, limited to p_limit (6 per PLAN.md §2). Non-NULL ->
+// lookup mode, same fields, no ranking/limit (still ordered by p_sort).
+//
+// No qty_sold here — it isn't displayed and isn't a sort option, so this
+// doesn't need SALES_CTE's 3-way union at all (a real cost saving; that
+// union is the expensive part of every other query that needs it).
 //
 // T-SQL's TOP doesn't support "no limit" directly (unlike Postgres's
 // LIMIT NULL) — search mode passes a very large number as the effective
@@ -9,7 +13,7 @@
 import 'server-only'
 import sql from 'mssql'
 import { getRequest } from '@/lib/mssql'
-import { SALES_CTE, ITEM_COST_CTE, STOCK_BALANCE_CTE } from '@/lib/db/sql-fragments'
+import { ITEM_COST_CTE, STOCK_BALANCE_CTE } from '@/lib/db/sql-fragments'
 
 const NO_LIMIT = 2147483647
 
@@ -20,6 +24,8 @@ interface ItemCatalogParams {
   p_branch?: string | null
   p_item?: string | null
   p_limit?: number | null
+  // 'item_code' (default) | 'cost_desc' | 'cost_asc' | 'price_desc' | 'price_asc'
+  p_sort?: string | null
 }
 
 export async function getItemCatalog(params: ItemCatalogParams) {
@@ -30,12 +36,12 @@ export async function getItemCatalog(params: ItemCatalogParams) {
   request.input('p_item_type', sql.NVarChar(100), params.p_item_type ?? null)
   request.input('p_branch', sql.NVarChar(50), params.p_branch ?? null)
   request.input('p_item', sql.NVarChar(50), params.p_item ?? null)
+  request.input('p_sort', sql.NVarChar(20), params.p_sort ?? 'item_code')
   // No limit at all in search mode — matches Postgres's `LIMIT NULL`.
   request.input('p_effective_limit', sql.Int, search ? NO_LIMIT : (params.p_limit ?? 6))
 
   const result = await request.query(`
-    WITH ${SALES_CTE},
-    ${ITEM_COST_CTE},
+    WITH ${ITEM_COST_CTE},
     ${STOCK_BALANCE_CTE},
     recent_price AS (
       -- Most recent CS or IV line per item, by DocDate (DtlKey as a same-day
@@ -54,19 +60,16 @@ export async function getItemCatalog(params: ItemCatalogParams) {
       ) ranked
       WHERE rn = 1
     ),
-    sold AS (
-      SELECT item_id, COALESCE(SUM(quantity), 0) AS qty_sold
-      FROM sales
-      GROUP BY item_id
-    ),
-    -- Pick the N *items* first (top-6-by-qty-sold in browse mode, or every
+    -- Pick the N *items* first (ranked by p_sort in browse mode, or every
     -- search match) — branch stock is joined afterward, unlimited, so one
-    -- popular item with 4 branches doesn't crowd out the other 5 slots.
+    -- item with 4 branches doesn't crowd out the other 5 slots. Cost/unit
+    -- price are joined in here already (not after) so TOP can rank by them.
     matched_items AS (
       SELECT TOP (@p_effective_limit)
-        i.ItemCode, i.Description, i.ItemGroup, i.ItemType, ic.Cost
+        i.ItemCode, i.Description, i.ItemGroup, i.ItemType, ic.Cost, rp.unit_price
       FROM Item i
       LEFT JOIN item_cost ic ON ic.ItemCode = i.ItemCode
+      LEFT JOIN recent_price rp ON rp.item_id = i.ItemCode
       WHERE
         (@p_item_group IS NULL OR i.ItemGroup = @p_item_group)
         AND (@p_item_type IS NULL OR i.ItemType = @p_item_type)
@@ -74,7 +77,12 @@ export async function getItemCatalog(params: ItemCatalogParams) {
         -- Case-sensitivity here follows the database's collation, same as
         -- Postgres's original ILIKE (case-insensitive) assumed.
         AND (@p_search IS NULL OR i.Description LIKE '%' + @p_search + '%' OR i.ItemCode LIKE '%' + @p_search + '%')
-      ORDER BY (SELECT qty_sold FROM sold WHERE sold.item_id = i.ItemCode) DESC, i.Description
+      ORDER BY
+        CASE WHEN @p_sort = 'cost_desc' THEN ic.Cost END DESC,
+        CASE WHEN @p_sort = 'cost_asc' THEN ic.Cost END ASC,
+        CASE WHEN @p_sort = 'price_desc' THEN rp.unit_price END DESC,
+        CASE WHEN @p_sort = 'price_asc' THEN rp.unit_price END ASC,
+        i.ItemCode
     )
     SELECT
       mi.ItemCode AS item_id,
@@ -85,14 +93,16 @@ export async function getItemCatalog(params: ItemCatalogParams) {
       b.BranchName AS branch_name,
       COALESCE(sb.qty_on_hand, 0) AS qty_on_hand,
       COALESCE(mi.Cost, 0) AS cost,
-      COALESCE(rp.unit_price, 0) AS unit_price,
-      COALESCE(so.qty_sold, 0) AS qty_sold
+      COALESCE(mi.unit_price, 0) AS unit_price
     FROM matched_items mi
     LEFT JOIN stock_balance sb ON sb.item_id = mi.ItemCode AND (@p_branch IS NULL OR sb.branch_id = @p_branch)
     LEFT JOIN Branch b ON b.BranchCode = sb.branch_id
-    LEFT JOIN recent_price rp ON rp.item_id = mi.ItemCode
-    LEFT JOIN sold so ON so.item_id = mi.ItemCode
-    ORDER BY COALESCE(so.qty_sold, 0) DESC, mi.Description, b.BranchName;
+    ORDER BY
+      CASE WHEN @p_sort = 'cost_desc' THEN mi.Cost END DESC,
+      CASE WHEN @p_sort = 'cost_asc' THEN mi.Cost END ASC,
+      CASE WHEN @p_sort = 'price_desc' THEN mi.unit_price END DESC,
+      CASE WHEN @p_sort = 'price_asc' THEN mi.unit_price END ASC,
+      mi.ItemCode, b.BranchName;
   `)
   return result.recordset
 }

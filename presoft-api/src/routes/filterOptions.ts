@@ -16,17 +16,16 @@ interface EntityOption {
  *     tags: [Filters]
  *     responses:
  *       200:
- *         description: Branches, items, sales agents, debtors, creditors, item groups/types, currencies, and the overall date range.
+ *         description: Branches, items, sales agents, debtors, item groups/types, currencies, and the overall date range.
  */
 filterOptionsRouter.get('/filter-options', async (_req, res, next) => {
   try {
     const request = await getRequest()
     const result = await request.query(`
-      SELECT BranchCode AS id, BranchName AS name FROM Branch ORDER BY BranchName;
-      SELECT ItemCode AS id, Description AS name FROM Item ORDER BY Description;
-      SELECT SalesAgent AS id, Description AS name FROM SalesAgent ORDER BY Description;
+      SELECT BranchCode AS id, BranchCode AS name FROM Branch ORDER BY BranchCode;
+      SELECT ItemCode AS id, ItemCode AS name FROM Item ORDER BY ItemCode;
+      SELECT SalesAgent AS id, SalesAgent AS name FROM SalesAgent ORDER BY SalesAgent;
       SELECT AccNo AS id, CompanyName AS name FROM Debtor ORDER BY CompanyName;
-      SELECT AccNo AS id, CompanyName AS name FROM Creditor ORDER BY CompanyName;
       SELECT DISTINCT ItemGroup AS value FROM Item WHERE ItemGroup IS NOT NULL ORDER BY ItemGroup;
       SELECT DISTINCT ItemType AS value FROM Item WHERE ItemType IS NOT NULL ORDER BY ItemType;
       SELECT DISTINCT CurrencyCode AS value FROM (
@@ -39,9 +38,9 @@ filterOptionsRouter.get('/filter-options', async (_req, res, next) => {
       ) x;
     `)
 
-    const [branches, items, sales_agents, debtors, creditors, groups, types, currencies, dates] =
+    const [branches, items, sales_agents, debtors, groups, types, currencies, dates] =
       result.recordsets as unknown as [
-        EntityOption[], EntityOption[], EntityOption[], EntityOption[], EntityOption[],
+        EntityOption[], EntityOption[], EntityOption[], EntityOption[],
         { value: string }[], { value: string }[], { value: string }[],
         { date_min: Date | null; date_max: Date | null }[]
       ]
@@ -51,7 +50,6 @@ filterOptionsRouter.get('/filter-options', async (_req, res, next) => {
       items,
       sales_agents,
       debtors,
-      creditors,
       item_groups: groups.map((r) => r.value),
       item_types: types.map((r) => r.value),
       currencies: currencies.map((r) => r.value),

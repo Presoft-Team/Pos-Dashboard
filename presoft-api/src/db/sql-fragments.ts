@@ -9,16 +9,18 @@
 // verified against real data) only has to change one place.
 
 // Unified sales shape (cash + credit + credit-note netting), mirroring the
-// dashboard app's old schema_v2.sql `sales` table.
+// dashboard app's old schema_v2.sql `sales` table. Cash/Credit split only —
+// no paid/unpaid/overdue tracking (that used to join ARInvoice for
+// Outstanding/DueDate; dropped along with the paid/due_date columns).
 // Columns: doc_no, is_credit, order_date, branch_id, item_id,
-// sales_agent_id, debtor_id, quantity, revenue, currency, due_date, paid
+// sales_agent_id, debtor_id, quantity, revenue, currency
 export const SALES_CTE = `
 cash AS (
   SELECT
     cs.DocNo AS doc_no, CAST(0 AS BIT) AS is_credit, cs.DocDate AS order_date,
     cs.BranchCode AS branch_id, csd.ItemCode AS item_id, cs.SalesAgent AS sales_agent_id,
     cs.DebtorCode AS debtor_id, csd.Qty AS quantity, csd.SubTotal AS revenue,
-    cs.CurrencyCode AS currency, CAST(NULL AS DATE) AS due_date, CAST(NULL AS BIT) AS paid
+    cs.CurrencyCode AS currency
   FROM CS cs
   JOIN CSDTL csd ON csd.DocKey = cs.DocKey
 ),
@@ -27,35 +29,22 @@ credit AS (
     iv.DocNo AS doc_no, CAST(1 AS BIT) AS is_credit, iv.DocDate AS order_date,
     iv.BranchCode AS branch_id, ivd.ItemCode AS item_id, iv.SalesAgent AS sales_agent_id,
     iv.DebtorCode AS debtor_id, ivd.Qty AS quantity, ivd.SubTotal AS revenue,
-    iv.CurrencyCode AS currency, ari.DueDate AS due_date,
-    -- NULL Outstanding (no AR record found yet, or genuinely NULL) falls
-    -- through CASE to ELSE — treated as unpaid, the conservative default.
-    CASE WHEN ari.Outstanding <= 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END AS paid
+    iv.CurrencyCode AS currency
   FROM IV iv
   JOIN IVDTL ivd ON ivd.DocKey = iv.DocKey
-  -- Join assumed pending verification against real data — run
-  -- SELECT DISTINCT SourceType FROM ARInvoice and confirm 'IV' shows up
-  -- with SourceKey = IV.DocKey. If wrong, fix ONLY here.
-  LEFT JOIN ARInvoice ari ON ari.SourceType = 'IV' AND ari.SourceKey = iv.DocKey
 ),
 credit_notes AS (
   -- Revenue-only netting (qty untouched, by explicit design decision):
-  -- bucketed cash/credit by whichever doc CN.OurInvoiceNo resolves to, and
-  -- for credit originals, inherits that invoice's CURRENT paid/due-date
-  -- bucket so the reduction nets against wherever its balance currently
-  -- lives (not left NULL, which would silently vanish from every KPI
-  -- bucket's CASE WHEN).
+  -- bucketed cash/credit by whichever doc CN.OurInvoiceNo resolves to.
   SELECT
     cn.DocNo AS doc_no,
     CASE WHEN orig_iv.DocKey IS NOT NULL THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END AS is_credit,
     cn.DocDate AS order_date, cn.BranchCode AS branch_id, cnd.ItemCode AS item_id,
     cn.SalesAgent AS sales_agent_id, cn.DebtorCode AS debtor_id,
-    0 AS quantity, -cnd.SubTotal AS revenue, cn.CurrencyCode AS currency, ari.DueDate AS due_date,
-    CASE WHEN ari.Outstanding <= 0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END AS paid
+    0 AS quantity, -cnd.SubTotal AS revenue, cn.CurrencyCode AS currency
   FROM CN cn
   JOIN CNDTL cnd ON cnd.DocKey = cn.DocKey
   LEFT JOIN IV orig_iv ON orig_iv.DocNo = cn.OurInvoiceNo
-  LEFT JOIN ARInvoice ari ON ari.SourceType = 'IV' AND ari.SourceKey = orig_iv.DocKey
 ),
 sales AS (
   SELECT * FROM cash
@@ -65,13 +54,13 @@ sales AS (
 `.trim()
 
 // Unified purchases shape — real invoice (PI), not the order (PO).
-// Columns: doc_no, order_date, branch_id, item_id, creditor_id, quantity,
-// unit_cost, currency
+// Columns: doc_no, order_date, branch_id, item_id, quantity, unit_cost,
+// currency
 export const PURCHASES_CTE = `
 purchases AS (
   SELECT
     pi.DocNo AS doc_no, pi.DocDate AS order_date, pi.BranchCode AS branch_id,
-    pid.ItemCode AS item_id, pi.CreditorCode AS creditor_id, pid.Qty AS quantity,
+    pid.ItemCode AS item_id, pid.Qty AS quantity,
     pid.UnitPrice AS unit_cost, pi.CurrencyCode AS currency
   FROM PI pi
   JOIN PIDTL pid ON pid.DocKey = pi.DocKey
@@ -120,11 +109,5 @@ export function salesCommonWhere(alias = 's') {
     AND (@item_group IS NULL OR i.ItemGroup = @item_group)
     AND (@item_type IS NULL OR i.ItemType = @item_type)
     AND (@currency IS NULL OR ${alias}.currency = @currency)
-    AND (
-      @creditor IS NULL OR ${alias}.item_id IN (
-        SELECT DISTINCT pid2.ItemCode FROM PI pi2 JOIN PIDTL pid2 ON pid2.DocKey = pi2.DocKey
-        WHERE pi2.CreditorCode = @creditor
-      )
-    )
   `.trim()
 }

@@ -14,7 +14,6 @@ import {
   getPerformanceItem,
   getPerformanceSalesAgent,
   getPerformanceDebtor,
-  getPerformanceCreditor,
 } from './queries/performance'
 import { getItemCatalog } from './queries/itemCatalog'
 
@@ -34,6 +33,5 @@ export const rpcRegistry: Record<string, RpcHandler> = {
   get_performance_item_v2: (p) => getPerformanceItem(p),
   get_performance_sales_agent_v2: (p) => getPerformanceSalesAgent(p),
   get_performance_debtor_v2: (p) => getPerformanceDebtor(p),
-  get_performance_creditor_v2: (p) => getPerformanceCreditor(p),
   get_item_catalog_v2: (p) => getItemCatalog(p),
 }

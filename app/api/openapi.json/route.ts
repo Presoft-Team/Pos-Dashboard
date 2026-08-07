@@ -16,7 +16,6 @@ const commonParamsProperties = {
   p_item: nullableString,
   p_sales_agent: nullableString,
   p_debtor: nullableString,
-  p_creditor: nullableString,
   p_item_group: nullableString,
   p_item_type: nullableString,
   p_currency: nullableString,
@@ -63,12 +62,6 @@ const entityOptionArray = {
   },
 }
 
-const revenueSplitProperties = {
-  revenue_paid: money,
-  revenue_not_due: money,
-  revenue_overdue: money,
-}
-
 const performanceRowSchema = {
   type: 'array',
   items: {
@@ -100,7 +93,7 @@ const openApiSpec = {
   paths: {
     '/get_filter_options_v2': rpcPath(
       'Global FilterBar options',
-      'Populates the 5 entity dropdowns, item group/type/currency lists, and date range. Ignores the request body.',
+      'Populates the 4 entity dropdowns, item group/type/currency lists, and date range. Ignores the request body.',
       { type: 'object' },
       {
         type: 'array',
@@ -112,7 +105,6 @@ const openApiSpec = {
             items: entityOptionArray,
             sales_agents: entityOptionArray,
             debtors: entityOptionArray,
-            creditors: entityOptionArray,
             item_groups: { type: 'array', items: { type: 'string' } },
             item_types: { type: 'array', items: { type: 'string' } },
             currencies: { type: 'array', items: { type: 'string' } },
@@ -125,7 +117,7 @@ const openApiSpec = {
 
     '/get_kpi_summary_v2': rpcPath(
       'Sales Dashboard KPI cards',
-      'Revenue split 3 ways (paid/not-due/overdue) x currency, plus cash/credit qty and transaction counts.',
+      'Total/Cash/Credit revenue x currency, plus total purchase amount (actual PI/PIDTL spend).',
       { type: 'object', properties: commonParamsProperties },
       {
         type: 'array',
@@ -133,12 +125,10 @@ const openApiSpec = {
           type: 'object',
           properties: {
             currency: { type: 'string' },
-            ...revenueSplitProperties,
-            total_cost: money,
-            cash_qty: { type: 'number' },
-            credit_qty: { type: 'number' },
-            cash_transactions: { type: 'integer' },
-            credit_transactions: { type: 'integer' },
+            cash_revenue: money,
+            credit_revenue: money,
+            total_revenue: money,
+            total_purchase: money,
           },
         },
       }
@@ -146,7 +136,7 @@ const openApiSpec = {
 
     '/get_item_revenue_v2': rpcPath(
       'Revenue by Item/Group/Type chart',
-      'Every bucket (not just top 5) — frontend folds the rest into "Other" client-side.',
+      'Total value only (Cash/Credit split). Every bucket (not just top 5) — frontend folds the rest into "Other" client-side.',
       {
         type: 'object',
         properties: { ...commonParamsProperties, p_group_by: groupByParam },
@@ -158,10 +148,10 @@ const openApiSpec = {
           properties: {
             bucket_name: { type: 'string' },
             currency: { type: 'string' },
-            ...revenueSplitProperties,
-            qty_paid: { type: 'number' },
-            qty_not_due: { type: 'number' },
-            qty_overdue: { type: 'number' },
+            credit_qty: { type: 'number' },
+            cash_qty: { type: 'number' },
+            credit_revenue: money,
+            cash_revenue: money,
           },
         },
       }
@@ -169,7 +159,7 @@ const openApiSpec = {
 
     '/get_item_best_sellers_v2': rpcPath(
       'Best Sellers table',
-      'Cash/Credit split (not the chart\'s Paid/Not-due/Overdue split). Same p_group_by toggle as get_item_revenue_v2.',
+      'Cash/Credit split. Same p_group_by toggle as get_item_revenue_v2.',
       {
         type: 'object',
         properties: {
@@ -196,7 +186,7 @@ const openApiSpec = {
 
     '/get_monthly_trend_v2': rpcPath(
       'Monthly Sales trend chart',
-      '4-line trend: Total, Cash+Paid, Not-due, Overdue.',
+      'Cash/Credit revenue split, per month.',
       { type: 'object', properties: commonParamsProperties },
       {
         type: 'array',
@@ -206,8 +196,8 @@ const openApiSpec = {
             year: { type: 'integer' },
             month: { type: 'integer' },
             currency: { type: 'string' },
-            total_revenue: money,
-            ...revenueSplitProperties,
+            cash_revenue: money,
+            credit_revenue: money,
           },
         },
       }
@@ -268,18 +258,10 @@ const openApiSpec = {
       performanceRowSchema
     ),
 
-    '/get_performance_creditor_v2': rpcPath(
-      'Performance page — by Creditor',
-      'Purchases, not sales — credit_qty/credit_revenue are always 0 here; cash_qty/cash_revenue mean purchase qty/cost. ' +
-        'p_creditor filters directly; every other filter narrows the item set via sales first.',
-      { type: 'object', properties: { ...commonParamsProperties, p_limit: nullableInt } },
-      performanceRowSchema
-    ),
-
     '/get_item_catalog_v2': rpcPath(
       'Item page catalog',
-      'p_search null = browse mode (top p_limit items by qty sold); p_search set = lookup mode (every match, unlimited). ' +
-        'Uses its own param set, not the common filter params — no date/sales_agent/debtor/creditor/currency.',
+      'p_search null = browse mode (top p_limit items ranked by p_sort); p_search set = lookup mode (every match, unlimited, still ordered by p_sort). ' +
+        'Uses its own param set, not the common filter params — no date/sales_agent/debtor/currency.',
       {
         type: 'object',
         properties: {
@@ -288,6 +270,7 @@ const openApiSpec = {
           p_item_type: nullableString,
           p_branch: nullableString,
           p_item: nullableString,
+          p_sort: { ...nullableString, enum: ['item_code', 'cost_desc', 'cost_asc', 'price_desc', 'price_asc'], default: 'item_code' },
           p_limit: { ...nullableInt, default: 6 },
         },
       },
@@ -305,7 +288,6 @@ const openApiSpec = {
             qty_on_hand: { type: 'number' },
             cost: money,
             unit_price: money,
-            qty_sold: { type: 'number' },
           },
         },
       }

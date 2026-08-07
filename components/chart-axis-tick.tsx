@@ -1,7 +1,7 @@
 'use client'
 
 // Shared x-axis label staggering, used by every chart with a category axis
-// (bar-chart, stacked-bar-chart, monthly-trend-chart). Every label stays
+// (bar-chart, monthly-trend-chart). Every label stays
 // visible — none are ever hidden. Row count is chosen by actually measuring:
 // try 1 row, and only add a row if some label wouldn't fit its slot at that
 // row count. Never more than MAX_ROWS. If even MAX_ROWS rows can't fit

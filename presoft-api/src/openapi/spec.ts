@@ -11,7 +11,6 @@ const commonFilterParams = {
   item: { name: 'item', in: 'query', schema: { type: 'string' }, description: 'Item code (Item.ItemCode).' },
   sales_agent: { name: 'sales_agent', in: 'query', schema: { type: 'string' }, description: 'Sales agent code (SalesAgent.SalesAgent).' },
   debtor: { name: 'debtor', in: 'query', schema: { type: 'string' }, description: 'Debtor account number (Debtor.AccNo).' },
-  creditor: { name: 'creditor', in: 'query', schema: { type: 'string' }, description: 'Creditor account number (Creditor.AccNo).' },
   item_group: { name: 'item_group', in: 'query', schema: { type: 'string' }, description: 'Item.ItemGroup.' },
   item_type: { name: 'item_type', in: 'query', schema: { type: 'string' }, description: 'Item.ItemType.' },
   currency: { name: 'currency', in: 'query', schema: { type: 'string' }, description: 'Currency code, e.g. MYR.' },

@@ -18,7 +18,7 @@ const GROUP_BY_CASE = (col: string) => `
  * @openapi
  * /api/v1/sales/revenue:
  *   get:
- *     summary: Revenue by Item/Group/Type, split into Paid/Not-due/Overdue buckets
+ *     summary: Revenue by Item/Group/Type, split into Cash/Credit columns
  *     tags: [Sales]
  *     parameters:
  *       - $ref: '#/components/parameters/date_from'
@@ -27,7 +27,6 @@ const GROUP_BY_CASE = (col: string) => `
  *       - $ref: '#/components/parameters/item'
  *       - $ref: '#/components/parameters/sales_agent'
  *       - $ref: '#/components/parameters/debtor'
- *       - $ref: '#/components/parameters/creditor'
  *       - $ref: '#/components/parameters/item_group'
  *       - $ref: '#/components/parameters/item_type'
  *       - $ref: '#/components/parameters/currency'
@@ -46,19 +45,17 @@ salesRouter.get('/sales/revenue', async (req, res, next) => {
     const result = await request.query(`
       WITH ${SALES_CTE}
       SELECT
-        ${GROUP_BY_CASE('Description')} AS bucket_name,
+        ${GROUP_BY_CASE('ItemCode')} AS bucket_name,
         s.currency,
-        COALESCE(SUM(CASE WHEN s.is_credit = 0 OR s.paid = 1 THEN s.revenue ELSE 0 END), 0) AS revenue_paid,
-        COALESCE(SUM(CASE WHEN s.is_credit = 1 AND s.paid = 0 AND s.due_date >= CAST(GETDATE() AS DATE) THEN s.revenue ELSE 0 END), 0) AS revenue_not_due,
-        COALESCE(SUM(CASE WHEN s.is_credit = 1 AND s.paid = 0 AND s.due_date < CAST(GETDATE() AS DATE) THEN s.revenue ELSE 0 END), 0) AS revenue_overdue,
-        COALESCE(SUM(CASE WHEN s.is_credit = 0 OR s.paid = 1 THEN s.quantity ELSE 0 END), 0) AS qty_paid,
-        COALESCE(SUM(CASE WHEN s.is_credit = 1 AND s.paid = 0 AND s.due_date >= CAST(GETDATE() AS DATE) THEN s.quantity ELSE 0 END), 0) AS qty_not_due,
-        COALESCE(SUM(CASE WHEN s.is_credit = 1 AND s.paid = 0 AND s.due_date < CAST(GETDATE() AS DATE) THEN s.quantity ELSE 0 END), 0) AS qty_overdue
+        COALESCE(SUM(CASE WHEN s.is_credit = 1 THEN s.quantity ELSE 0 END), 0) AS credit_qty,
+        COALESCE(SUM(CASE WHEN s.is_credit = 0 THEN s.quantity ELSE 0 END), 0) AS cash_qty,
+        COALESCE(SUM(CASE WHEN s.is_credit = 1 THEN s.revenue ELSE 0 END), 0) AS credit_revenue,
+        COALESCE(SUM(CASE WHEN s.is_credit = 0 THEN s.revenue ELSE 0 END), 0) AS cash_revenue
       FROM sales s
       JOIN Item i ON i.ItemCode = s.item_id
       WHERE ${salesCommonWhere('s')}
-      GROUP BY ${GROUP_BY_CASE('Description')}, s.currency
-      ORDER BY (revenue_paid + revenue_not_due + revenue_overdue) DESC;
+      GROUP BY ${GROUP_BY_CASE('ItemCode')}, s.currency
+      ORDER BY (COALESCE(SUM(s.revenue), 0)) DESC;
     `)
     res.json(result.recordset)
   } catch (err) {
@@ -79,7 +76,6 @@ salesRouter.get('/sales/revenue', async (req, res, next) => {
  *       - $ref: '#/components/parameters/item'
  *       - $ref: '#/components/parameters/sales_agent'
  *       - $ref: '#/components/parameters/debtor'
- *       - $ref: '#/components/parameters/creditor'
  *       - $ref: '#/components/parameters/item_group'
  *       - $ref: '#/components/parameters/item_type'
  *       - $ref: '#/components/parameters/currency'
@@ -101,7 +97,7 @@ salesRouter.get('/sales/best-sellers', async (req, res, next) => {
     const result = await request.query(`
       WITH ${SALES_CTE}
       SELECT TOP (@limit)
-        ${GROUP_BY_CASE('Description')} AS bucket_name,
+        ${GROUP_BY_CASE('ItemCode')} AS bucket_name,
         s.currency,
         COALESCE(SUM(CASE WHEN s.is_credit = 1 THEN s.quantity ELSE 0 END), 0) AS credit_qty,
         COALESCE(SUM(CASE WHEN s.is_credit = 0 THEN s.quantity ELSE 0 END), 0) AS cash_qty,
@@ -110,7 +106,7 @@ salesRouter.get('/sales/best-sellers', async (req, res, next) => {
       FROM sales s
       JOIN Item i ON i.ItemCode = s.item_id
       WHERE ${salesCommonWhere('s')}
-      GROUP BY ${GROUP_BY_CASE('Description')}, s.currency
+      GROUP BY ${GROUP_BY_CASE('ItemCode')}, s.currency
       ORDER BY (COALESCE(SUM(s.revenue), 0)) DESC;
     `)
     res.json(result.recordset)

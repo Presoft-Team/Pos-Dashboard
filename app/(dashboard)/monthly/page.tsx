@@ -2,17 +2,22 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/db/client'
-import { FilterOptions, Filters, GroupByMode, MonthlyBreakdownRow, MonthlyTrendRow } from '@/types'
-import { DEFAULT_FILTERS, DEFAULT_OPTIONS, toParams } from '@/lib/filters'
+import { GroupByMode, MonthlyBreakdownRow, MonthlyTrendRow } from '@/types'
+import { toParams } from '@/lib/filters'
+import { useSharedFilters } from '@/lib/filter-context'
 import { formatAmount, pivotMonthlyTrend } from '@/lib/currency'
 import { ExportColumn } from '@/lib/export'
 import FilterBar from '@/components/filter-bar'
 import CurrencyFilter from '@/components/currency-filter'
+import DatePresetFilter, { MONTHLY_PRESETS, DASHBOARD_PRESETS, findMatchingPreset, defaultDateRange } from '@/components/date-preset-filter'
 import MonthlyTrendChart from '@/components/monthly-trend-chart'
 import ExportModal, { ExportChartSpec, ExportTableSpec } from '@/components/export-modal'
 import { Download } from 'lucide-react'
 
 const MONTH_NAMES = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+const BREAKDOWN_INITIAL_VISIBLE = 6
+const BREAKDOWN_SHOW_MORE_STEP = 6
 
 const MONTHLY_COLUMNS: ExportColumn[] = [
   { key: 'month_label', label: 'Month' },
@@ -26,16 +31,28 @@ const MONTHLY_COLUMNS: ExportColumn[] = [
 export default function MonthlyPage() {
   const supabase = createClient()
 
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
-  const [options, setOptions] = useState<FilterOptions>(DEFAULT_OPTIONS)
-  const [groupBy, setGroupBy] = useState<GroupByMode>('item')
+  const { filters, setFilters, groupBy, setGroupBy, options } = useSharedFilters()
   const [trend, setTrend] = useState<MonthlyTrendRow[]>([])
   const [breakdown, setBreakdown] = useState<MonthlyBreakdownRow[]>([])
   const [loading, setLoading] = useState(true)
   const [exportOpen, setExportOpen] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(BREAKDOWN_INITIAL_VISIBLE)
 
-  useEffect(() => { fetchOptions() }, [])
   useEffect(() => { fetchData() }, [filters])
+  // Reset expansion whenever new data comes in (new filters/date range).
+  useEffect(() => { setVisibleCount(BREAKDOWN_INITIAL_VISIBLE) }, [breakdown])
+  // Date range is shared with Sales Dashboard/Performance, but Monthly's
+  // own preset buttons only go down to 6 Months — 30 Days / 4 Months exist
+  // there but have no equivalent button here. Landing on Monthly with one
+  // of those active falls back to Monthly's own 6-month default instead of
+  // showing an unrepresentable range; a genuine custom range (or 6m/12m,
+  // which both pages share) is left alone. Runs once per page visit, not on
+  // every filters change, since this is a one-time landing reconciliation.
+  useEffect(() => {
+    const dashboardOnly = findMatchingPreset(filters, DASHBOARD_PRESETS) && !findMatchingPreset(filters, MONTHLY_PRESETS)
+    if (dashboardOnly) setFilters((f) => ({ ...f, ...defaultDateRange(MONTHLY_PRESETS) }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // FilterBar's Item/Group/Type slot swaps meaning with the toggle — clear
   // whichever of the 3 fields was set so switching modes doesn't leave a
@@ -45,11 +62,6 @@ export default function MonthlyPage() {
   function handleGroupByChange(next: GroupByMode) {
     setGroupBy(next)
     setFilters((f) => ({ ...f, item: '', item_group: '', item_type: '' }))
-  }
-
-  async function fetchOptions() {
-    const { data } = await supabase.rpc('get_filter_options_v2')
-    if (data?.[0]) setOptions(data[0] as FilterOptions)
   }
 
   async function fetchData() {
@@ -99,13 +111,22 @@ export default function MonthlyPage() {
             onChange={setFilters}
             groupBy={groupBy}
             onGroupByChange={handleGroupByChange}
+            datePicker={<DatePresetFilter filters={filters} options={options} onChange={setFilters} presets={MONTHLY_PRESETS} />}
             trailing={[
-              <CurrencyFilter
-                key="currency"
-                value={filters.currency}
-                options={options.currencies}
-                onChange={(v) => setFilters({ ...filters, currency: v })}
-              />,
+              // Omitted entirely (not just left to CurrencyFilter's own
+              // null-render) when there's only 0/1 currency — a rendered-
+              // but-empty slot still occupies a mobile grid cell, leaving a
+              // real gap instead of letting Export slide into it.
+              ...(options.currencies.length > 1
+                ? [
+                    <CurrencyFilter
+                      key="currency"
+                      value={filters.currency}
+                      options={options.currencies}
+                      onChange={(v) => setFilters({ ...filters, currency: v })}
+                    />,
+                  ]
+                : []),
               <button
                 key="export"
                 onClick={() => setExportOpen(true)}
@@ -131,42 +152,80 @@ export default function MonthlyPage() {
         )}
       </div>
 
-      {/* Monthly breakdown table — latest 6 months */}
-      {!loading && breakdown.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h3 className="font-semibold text-gray-900 text-sm">Monthly Breakdown</h3>
+      {/* Monthly breakdown table */}
+      {!loading && breakdown.length > 0 && (() => {
+        const visibleRows = breakdown.slice(0, visibleCount)
+        const hasMore = visibleCount < breakdown.length
+        const isExpanded = visibleCount > BREAKDOWN_INITIAL_VISIBLE
+        // The month-divider border only means something when a month can
+        // have more than one row (one per currency) — with a single
+        // currency every row is trivially "last of its month," so the
+        // border would show on every row for no reason.
+        const hasMultipleCurrencies = new Set(breakdown.map((m) => m.currency)).size > 1
+        return (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900 text-sm">Monthly Breakdown</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-left">
+                    <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Month</th>
+                    <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Currency</th>
+                    <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Credit Revenue</th>
+                    <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Cash Revenue</th>
+                    <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {visibleRows.map((m, i) => {
+                    const next = visibleRows[i + 1]
+                    const isLastOfMonth = !next || next.year !== m.year || next.month !== m.month
+                    return (
+                      <tr key={i} className={`hover:bg-gray-50 ${hasMultipleCurrencies && isLastOfMonth ? 'border-b-2 border-gray-300' : ''}`}>
+                        <td className="px-4 py-3 font-medium text-gray-900">{MONTH_NAMES[m.month]} {m.year}</td>
+                        <td className="px-4 py-3 text-gray-600">{m.currency}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(m.credit_revenue)}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(m.cash_revenue)}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(m.credit_revenue + m.cash_revenue)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {(hasMore || isExpanded) && (
+              <div className="flex items-center justify-center gap-3 px-5 py-3 border-t border-gray-100">
+                {hasMore && (
+                  <button
+                    onClick={() => setVisibleCount((c) => Math.min(c + BREAKDOWN_SHOW_MORE_STEP, breakdown.length))}
+                    className="text-sm font-medium text-brand hover:text-brand/80 transition-colors"
+                  >
+                    View 6 more
+                  </button>
+                )}
+                {hasMore && (
+                  <button
+                    onClick={() => setVisibleCount(breakdown.length)}
+                    className="text-sm font-medium text-brand hover:text-brand/80 transition-colors"
+                  >
+                    View all
+                  </button>
+                )}
+                {isExpanded && (
+                  <button
+                    onClick={() => setVisibleCount(BREAKDOWN_INITIAL_VISIBLE)}
+                    className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    View less
+                  </button>
+                )}
+              </div>
+            )}
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Month</th>
-                  <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Currency</th>
-                  <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Credit Revenue</th>
-                  <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Cash Revenue</th>
-                  <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {breakdown.map((m, i) => {
-                  const next = breakdown[i + 1]
-                  const isLastOfMonth = !next || next.year !== m.year || next.month !== m.month
-                  return (
-                    <tr key={i} className={`hover:bg-gray-50 ${isLastOfMonth ? 'border-b-2 border-gray-300' : ''}`}>
-                      <td className="px-4 py-3 font-medium text-gray-900">{MONTH_NAMES[m.month]} {m.year}</td>
-                      <td className="px-4 py-3 text-gray-600">{m.currency}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(m.credit_revenue)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(m.cash_revenue)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(m.credit_revenue + m.cash_revenue)}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+        )
+      })()}
 
       <ExportModal
         open={exportOpen}

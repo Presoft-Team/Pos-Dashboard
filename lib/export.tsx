@@ -41,7 +41,6 @@ export function formatFilterSummary(filters: Filters, options?: FilterOptions): 
   parts.push(`Item: ${filters.item ? nameOf(options?.items, filters.item) : 'All'}`)
   parts.push(`Sales Agent: ${filters.sales_agent ? nameOf(options?.sales_agents, filters.sales_agent) : 'All'}`)
   parts.push(`Debtor: ${filters.debtor ? nameOf(options?.debtors, filters.debtor) : 'All'}`)
-  parts.push(`Creditor: ${filters.creditor ? nameOf(options?.creditors, filters.creditor) : 'All'}`)
   parts.push(`Item Group: ${filters.item_group || 'All'}`)
   parts.push(`Item Type: ${filters.item_type || 'All'}`)
   return parts.join('   |   ')
@@ -52,9 +51,9 @@ function fmtInt(n: unknown) {
 }
 
 // Shared column set for every Cash/Credit-split entity-revenue table —
-// Sales Dashboard's Best Sellers, and Performance's 5 breakdown tables.
+// Sales Dashboard's Best Sellers, and Performance's 4 breakdown tables.
 // nameKey/nameLabel let each caller supply its own first column
-// (bucket_name for Best Sellers, name for Performance's 5 dimensions).
+// (bucket_name for Best Sellers, name for Performance's 4 dimensions).
 export function entityRevenueColumns(nameKey: string, nameLabel: string): ExportColumn[] {
   return [
     { key: nameKey, label: nameLabel },

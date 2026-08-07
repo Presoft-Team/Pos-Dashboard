@@ -13,7 +13,6 @@ export interface CommonFilters {
   item?: string | null
   sales_agent?: string | null
   debtor?: string | null
-  creditor?: string | null
   item_group?: string | null
   item_type?: string | null
   currency?: string | null
@@ -33,7 +32,6 @@ export function parseCommonFilters(req: Request): CommonFilters {
     item: str(q.item),
     sales_agent: str(q.sales_agent),
     debtor: str(q.debtor),
-    creditor: str(q.creditor),
     item_group: str(q.item_group),
     item_type: str(q.item_type),
     currency: str(q.currency),
@@ -49,7 +47,6 @@ export function bindCommonFilters(request: sql.Request, f: CommonFilters) {
   request.input('item', sql.NVarChar(50), f.item ?? null)
   request.input('sales_agent', sql.NVarChar(50), f.sales_agent ?? null)
   request.input('debtor', sql.NVarChar(50), f.debtor ?? null)
-  request.input('creditor', sql.NVarChar(50), f.creditor ?? null)
   request.input('item_group', sql.NVarChar(100), f.item_group ?? null)
   request.input('item_type', sql.NVarChar(100), f.item_type ?? null)
   request.input('currency', sql.NVarChar(10), f.currency ?? null)

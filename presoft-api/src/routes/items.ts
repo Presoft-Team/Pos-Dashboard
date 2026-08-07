@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import sql from 'mssql'
 import { getRequest } from '../db/pool'
-import { SALES_CTE, ITEM_COST_CTE, STOCK_BALANCE_CTE } from '../db/sql-fragments'
+import { ITEM_COST_CTE, STOCK_BALANCE_CTE } from '../db/sql-fragments'
 
 export const itemsRouter = Router()
 
@@ -11,11 +11,11 @@ const NO_LIMIT = 2147483647
  * @openapi
  * /api/v1/items:
  *   get:
- *     summary: Item catalog — cost, latest unit price, per-branch stock, qty sold
+ *     summary: Item catalog — cost, latest unit price, per-branch stock
  *     description: >
- *       Without `search`: browse mode, top N items ranked by quantity sold.
- *       With `search`: lookup mode, every item matching the name/code, no
- *       ranking or limit.
+ *       Without `search`: browse mode, top N items ranked by `sort`. With
+ *       `search`: lookup mode, every item matching the name/code, no limit
+ *       (still ordered by `sort`).
  *     tags: [Items]
  *     parameters:
  *       - name: search
@@ -26,6 +26,10 @@ const NO_LIMIT = 2147483647
  *       - $ref: '#/components/parameters/item_type'
  *       - $ref: '#/components/parameters/branch'
  *       - $ref: '#/components/parameters/item'
+ *       - name: sort
+ *         in: query
+ *         schema: { type: string, enum: [item_code, cost_desc, cost_asc, price_desc, price_asc], default: item_code }
+ *         description: Ranking used for browse-mode's top N and the result order.
  *       - name: limit
  *         in: query
  *         schema: { type: integer, default: 6 }
@@ -41,6 +45,7 @@ itemsRouter.get('/items', async (req, res, next) => {
     const itemType = typeof req.query.item_type === 'string' ? req.query.item_type : null
     const branch = typeof req.query.branch === 'string' ? req.query.branch : null
     const item = typeof req.query.item === 'string' ? req.query.item : null
+    const sort = typeof req.query.sort === 'string' ? req.query.sort : 'item_code'
     const limit = Number(req.query.limit ?? 6)
 
     const request = await getRequest()
@@ -49,12 +54,12 @@ itemsRouter.get('/items', async (req, res, next) => {
     request.input('item_type', sql.NVarChar(100), itemType)
     request.input('branch', sql.NVarChar(50), branch)
     request.input('item', sql.NVarChar(50), item)
+    request.input('sort', sql.NVarChar(20), sort)
     // No limit at all in search mode — T-SQL's TOP has no "unlimited" form.
     request.input('effective_limit', sql.Int, search ? NO_LIMIT : (Number.isFinite(limit) ? limit : 6))
 
     const result = await request.query(`
-      WITH ${SALES_CTE},
-      ${ITEM_COST_CTE},
+      WITH ${ITEM_COST_CTE},
       ${STOCK_BALANCE_CTE},
       recent_price AS (
         -- Most recent CS or IV line per item, by DocDate (DtlKey as a
@@ -73,22 +78,23 @@ itemsRouter.get('/items', async (req, res, next) => {
         ) ranked
         WHERE rn = 1
       ),
-      sold AS (
-        SELECT item_id, COALESCE(SUM(quantity), 0) AS qty_sold
-        FROM sales
-        GROUP BY item_id
-      ),
       matched_items AS (
         SELECT TOP (@effective_limit)
-          i.ItemCode, i.Description, i.ItemGroup, i.ItemType, ic.Cost
+          i.ItemCode, i.Description, i.ItemGroup, i.ItemType, ic.Cost, rp.unit_price
         FROM Item i
         LEFT JOIN item_cost ic ON ic.ItemCode = i.ItemCode
+        LEFT JOIN recent_price rp ON rp.item_id = i.ItemCode
         WHERE
           (@item_group IS NULL OR i.ItemGroup = @item_group)
           AND (@item_type IS NULL OR i.ItemType = @item_type)
           AND (@item IS NULL OR i.ItemCode = @item)
           AND (@search IS NULL OR i.Description LIKE '%' + @search + '%' OR i.ItemCode LIKE '%' + @search + '%')
-        ORDER BY (SELECT qty_sold FROM sold WHERE sold.item_id = i.ItemCode) DESC, i.Description
+        ORDER BY
+          CASE WHEN @sort = 'cost_desc' THEN ic.Cost END DESC,
+          CASE WHEN @sort = 'cost_asc' THEN ic.Cost END ASC,
+          CASE WHEN @sort = 'price_desc' THEN rp.unit_price END DESC,
+          CASE WHEN @sort = 'price_asc' THEN rp.unit_price END ASC,
+          i.ItemCode
       )
       SELECT
         mi.ItemCode AS item_id,
@@ -99,14 +105,16 @@ itemsRouter.get('/items', async (req, res, next) => {
         b.BranchName AS branch_name,
         COALESCE(sb.qty_on_hand, 0) AS qty_on_hand,
         COALESCE(mi.Cost, 0) AS cost,
-        COALESCE(rp.unit_price, 0) AS unit_price,
-        COALESCE(so.qty_sold, 0) AS qty_sold
+        COALESCE(mi.unit_price, 0) AS unit_price
       FROM matched_items mi
       LEFT JOIN stock_balance sb ON sb.item_id = mi.ItemCode AND (@branch IS NULL OR sb.branch_id = @branch)
       LEFT JOIN Branch b ON b.BranchCode = sb.branch_id
-      LEFT JOIN recent_price rp ON rp.item_id = mi.ItemCode
-      LEFT JOIN sold so ON so.item_id = mi.ItemCode
-      ORDER BY COALESCE(so.qty_sold, 0) DESC, mi.Description, b.BranchName;
+      ORDER BY
+        CASE WHEN @sort = 'cost_desc' THEN mi.Cost END DESC,
+        CASE WHEN @sort = 'cost_asc' THEN mi.Cost END ASC,
+        CASE WHEN @sort = 'price_desc' THEN mi.unit_price END DESC,
+        CASE WHEN @sort = 'price_asc' THEN mi.unit_price END ASC,
+        mi.ItemCode, b.BranchName;
     `)
     res.json(result.recordset)
   } catch (err) {

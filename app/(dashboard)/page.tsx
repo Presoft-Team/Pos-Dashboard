@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/db/client'
-import { FilterOptions, Filters, GroupByMode, ItemBestSellerRow, ItemRevenueRow, KpiSummary } from '@/types'
-import { DEFAULT_FILTERS, DEFAULT_OPTIONS, toParams } from '@/lib/filters'
-import { pivotItemRevenue } from '@/lib/currency'
+import { GroupByMode, ItemBestSellerRow, ItemRevenueRow, KpiSummary } from '@/types'
+import { toParams } from '@/lib/filters'
+import { useSharedFilters } from '@/lib/filter-context'
+import { pivotRevenueByCurrency } from '@/lib/currency'
 import KpiCards from '@/components/kpi-cards'
 import BestSellersTable from '@/components/best-sellers-table'
 import FilterBar from '@/components/filter-bar'
+import DatePresetFilter from '@/components/date-preset-filter'
 import CurrencyFilter from '@/components/currency-filter'
-import StackedBarChartWidget from '@/components/stacked-bar-chart'
+import BarChartWidget from '@/components/bar-chart'
 import ExportModal, { ExportChartSpec, ExportTableSpec } from '@/components/export-modal'
 import { entityRevenueColumns } from '@/lib/export'
 import { Download } from 'lucide-react'
@@ -19,16 +21,13 @@ const GROUP_LABEL: Record<GroupByMode, string> = { item: 'Item', group: 'Group',
 export default function DashboardPage() {
   const supabase = createClient()
 
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
-  const [options, setOptions] = useState<FilterOptions>(DEFAULT_OPTIONS)
-  const [groupBy, setGroupBy] = useState<GroupByMode>('item')
+  const { filters, setFilters, groupBy, setGroupBy, options } = useSharedFilters()
   const [kpi, setKpi] = useState<KpiSummary[]>([])
   const [itemRevenue, setItemRevenue] = useState<ItemRevenueRow[]>([])
   const [bestSellers, setBestSellers] = useState<ItemBestSellerRow[]>([])
   const [loading, setLoading] = useState(true)
   const [exportOpen, setExportOpen] = useState(false)
 
-  useEffect(() => { fetchOptions() }, [])
   useEffect(() => { fetchData() }, [filters, groupBy])
 
   // FilterBar's Item/Group/Type slot swaps meaning with the toggle — clear
@@ -37,12 +36,6 @@ export default function DashboardPage() {
   function handleGroupByChange(next: GroupByMode) {
     setGroupBy(next)
     setFilters((f) => ({ ...f, item: '', item_group: '', item_type: '' }))
-  }
-
-  async function fetchOptions() {
-    const { data, error } = await supabase.rpc('get_filter_options_v2')
-    if (error) console.error('get_filter_options_v2 error:', error.message)
-    if (data?.[0]) setOptions(data[0] as FilterOptions)
   }
 
   async function fetchData() {
@@ -66,12 +59,17 @@ export default function DashboardPage() {
   }
 
   // Top 5 + "Other" — see PLAN.md Section 4.
-  const chartData = pivotItemRevenue(itemRevenue, (r) => r.bucket_name, 5)
+  const chartData = pivotRevenueByCurrency(
+    itemRevenue.map((r) => ({ ...r, total_revenue: r.credit_revenue + r.cash_revenue, total_qty: r.credit_qty + r.cash_qty })),
+    (r) => r.bucket_name,
+    5,
+    true
+  )
   const chartTitle = `Revenue by ${GROUP_LABEL[groupBy]}`
 
   const exportCharts: ExportChartSpec[] = [
     { id: 'kpi', label: 'KPI Summary', render: () => <KpiCards data={kpi} /> },
-    { id: 'revenue-chart', label: chartTitle, render: () => <StackedBarChartWidget data={chartData} /> },
+    { id: 'revenue-chart', label: chartTitle, render: () => <BarChartWidget data={chartData} /> },
   ]
 
   const exportTables: ExportTableSpec[] = [
@@ -98,13 +96,22 @@ export default function DashboardPage() {
             onChange={setFilters}
             groupBy={groupBy}
             onGroupByChange={handleGroupByChange}
+            datePicker={<DatePresetFilter filters={filters} options={options} onChange={setFilters} />}
             trailing={[
-              <CurrencyFilter
-                key="currency"
-                value={filters.currency}
-                options={options.currencies}
-                onChange={(v) => setFilters({ ...filters, currency: v })}
-              />,
+              // Omitted entirely (not just left to CurrencyFilter's own
+              // null-render) when there's only 0/1 currency — a rendered-
+              // but-empty slot still occupies a mobile grid cell, leaving a
+              // real gap instead of letting Export slide into it.
+              ...(options.currencies.length > 1
+                ? [
+                    <CurrencyFilter
+                      key="currency"
+                      value={filters.currency}
+                      options={options.currencies}
+                      onChange={(v) => setFilters({ ...filters, currency: v })}
+                    />,
+                  ]
+                : []),
               <button
                 key="export"
                 onClick={() => setExportOpen(true)}
@@ -129,7 +136,7 @@ export default function DashboardPage() {
             <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <StackedBarChartWidget data={chartData} />
+          <BarChartWidget data={chartData} />
         )}
       </div>
 

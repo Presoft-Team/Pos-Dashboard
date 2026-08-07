@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react'
 import { Search } from 'lucide-react'
 import { createClient } from '@/lib/db/client'
-import { FilterOptions, Filters, GroupByMode, ItemCatalogRow } from '@/types'
-import { DEFAULT_FILTERS, DEFAULT_OPTIONS } from '@/lib/filters'
+import { GroupByMode, ItemCatalogRow } from '@/types'
+import { useSharedFilters } from '@/lib/filter-context'
 import { formatAmount } from '@/lib/currency'
 import Combobox from '@/components/combobox'
 import GroupByToggle from '@/components/group-by-toggle'
+import SortSelect from '@/components/sort-select'
 
 interface ItemGroup {
   item_id: string
@@ -17,7 +18,6 @@ interface ItemGroup {
   item_type: string | null
   cost: number         // one value per item, same across every branch
   unit_price: number
-  qty_sold: number
   branches: { branch_name: string; qty_on_hand: number }[]
 }
 
@@ -27,13 +27,21 @@ function groupByItem(rows: ItemCatalogRow[]): ItemGroup[] {
     const entry = map.get(row.item_id) ?? {
       item_id: row.item_id, item_code: row.item_code, description: row.description,
       item_group: row.item_group, item_type: row.item_type,
-      cost: row.cost, unit_price: row.unit_price, qty_sold: row.qty_sold, branches: [],
+      cost: row.cost, unit_price: row.unit_price, branches: [],
     }
     if (row.branch_name) entry.branches.push({ branch_name: row.branch_name, qty_on_hand: row.qty_on_hand })
     map.set(row.item_id, entry)
   }
   return [...map.values()]
 }
+
+const SORT_OPTIONS = [
+  { value: 'item_code', label: 'Item Code (A–Z)' },
+  { value: 'cost_desc', label: 'Cost: High to Low' },
+  { value: 'cost_asc', label: 'Cost: Low to High' },
+  { value: 'price_desc', label: 'Unit Price: High to Low' },
+  { value: 'price_asc', label: 'Unit Price: Low to High' },
+] as const
 
 const BRANCH_TABLE_INITIAL_VISIBLE = 5
 const BRANCH_TABLE_SHOW_MORE_STEP = 5
@@ -105,27 +113,24 @@ const ITEM_LIST_INITIAL_VISIBLE = 5
 const ITEM_LIST_SHOW_MORE_STEP = 5
 
 // Catalog/master-data page — NOT a sales-performance page. Default view
-// shows the top 5 items by qty sold; searching by name/ID switches to a
+// shows the top items ranked by `sort`; searching by name/ID switches to a
 // direct lookup instead of a ranking (PLAN.md Section 7).
 export default function ItemPage() {
   const supabase = createClient()
 
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
-  const [options, setOptions] = useState<FilterOptions>(DEFAULT_OPTIONS)
-  const [groupBy, setGroupBy] = useState<GroupByMode>('item')
+  const { filters, setFilters, groupBy, setGroupBy, options } = useSharedFilters()
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<string>('item_code')
   const [items, setItems] = useState<ItemGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [visibleItemCount, setVisibleItemCount] = useState(ITEM_LIST_INITIAL_VISIBLE)
-
-  useEffect(() => { fetchOptions() }, [])
 
   // Debounced so fast typing doesn't fire an RPC call per keystroke.
   useEffect(() => {
     const t = setTimeout(fetchData, 300)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, filters.branch, filters.item, filters.item_group, filters.item_type])
+  }, [search, sort, filters.branch, filters.item, filters.item_group, filters.item_type])
 
   // The Item/Group/Type toggle swaps which of the 3 fields the dynamic
   // combobox filters by — clear the other two so switching modes doesn't
@@ -133,11 +138,6 @@ export default function ItemPage() {
   function handleGroupByChange(next: GroupByMode) {
     setGroupBy(next)
     setFilters((f) => ({ ...f, item: '', item_group: '', item_type: '' }))
-  }
-
-  async function fetchOptions() {
-    const { data } = await supabase.rpc('get_filter_options_v2')
-    if (data?.[0]) setOptions(data[0] as FilterOptions)
   }
 
   async function fetchData() {
@@ -151,6 +151,7 @@ export default function ItemPage() {
       p_item_group: filters.item_group || null,
       p_item_type: filters.item_type || null,
       p_branch: filters.branch || null,
+      p_sort: sort,
       p_limit: null,
     })
     if (error) console.error('get_item_catalog_v2 error:', error.message)
@@ -169,6 +170,7 @@ export default function ItemPage() {
         options={options.item_groups.map((g) => ({ id: g, name: g }))}
         placeholder="All Item Groups"
         ariaLabel="Item Group"
+        fullWidth
       />
     ) : groupBy === 'type' ? (
       <Combobox
@@ -177,6 +179,7 @@ export default function ItemPage() {
         options={options.item_types.map((t) => ({ id: t, name: t }))}
         placeholder="All Item Types"
         ariaLabel="Item Type"
+        fullWidth
       />
     ) : (
       <Combobox
@@ -185,6 +188,7 @@ export default function ItemPage() {
         options={options.items}
         placeholder="All Items"
         ariaLabel="Item"
+        fullWidth
       />
     )
 
@@ -193,14 +197,52 @@ export default function ItemPage() {
       <div>
         <h1 className="text-xl font-bold text-gray-900">Item</h1>
         <p className="text-sm text-gray-500">
-          {search.trim() ? 'Search results' : 'Top 5 items by quantity sold'}
+          {search.trim() ? 'Search results' : 'Browse items'}
         </p>
       </div>
 
-      {/* Filters — Search + Branch (50/50 on mobile), Toggle + Item/Group/Type (50/50 on mobile) */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      {/* Filters — mobile: Search / Sort(60%)+Branch(40%) / Toggle+Item, each
+          its own row; desktop: single wrapped line. Different enough splits
+          (mobile pairs Branch with Sort, desktop pairs Branch with Search)
+          that it's two layouts, same pattern as FilterBar. */}
+      <div className="sm:hidden space-y-2">
+        <div className="relative w-full">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by item name or ID…"
+            className="w-full h-9 pl-9 pr-3 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
+          />
+        </div>
+        <div className="grid grid-cols-[3fr_2fr] gap-2">
+          <div className="min-w-0">
+            <SortSelect value={sort} options={SORT_OPTIONS} onChange={setSort} ariaLabel="Sort by" />
+          </div>
+          <div className="min-w-0">
+            <Combobox
+              value={filters.branch}
+              onChange={(v) => setFilters({ ...filters, branch: v })}
+              options={options.branches}
+              placeholder="All Branches"
+              ariaLabel="Branch"
+              fullWidth
+            />
+          </div>
+        </div>
         <div className="flex gap-2">
-          <div className="relative flex-1 min-w-0 sm:flex-none sm:w-64">
+          <div className="flex-1 min-w-0">
+            <GroupByToggle value={groupBy} onChange={handleGroupByChange} />
+          </div>
+          <div className="flex-1 min-w-0">{itemDynamic}</div>
+        </div>
+      </div>
+
+      <div className="hidden sm:flex sm:flex-col sm:gap-2">
+        {/* Search 60% / Sort 40% */}
+        <div className="grid grid-cols-[6fr_4fr] gap-2">
+          <div className="relative min-w-0">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
@@ -210,21 +252,29 @@ export default function ItemPage() {
               className="w-full h-9 pl-9 pr-3 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
             />
           </div>
-          <div className="flex-1 min-w-0 sm:flex-none">
+          <div className="min-w-0">
+            <SortSelect value={sort} options={SORT_OPTIONS} onChange={setSort} ariaLabel="Sort by" />
+          </div>
+        </div>
+        {/* Toggle 20% / Item-Group-Type combobox 40% / Branch 40% — each grid
+            child wrapped in min-w-0, otherwise a grid item's default
+            min-width is its content's intrinsic width, which overflows the
+            cell instead of shrinking once the track gets this narrow. */}
+        <div className="grid grid-cols-[2fr_4fr_4fr] gap-2">
+          <div className="min-w-0">
+            <GroupByToggle value={groupBy} onChange={handleGroupByChange} />
+          </div>
+          <div className="min-w-0">{itemDynamic}</div>
+          <div className="min-w-0">
             <Combobox
               value={filters.branch}
               onChange={(v) => setFilters({ ...filters, branch: v })}
               options={options.branches}
               placeholder="All Branches"
               ariaLabel="Branch"
+              fullWidth
             />
           </div>
-        </div>
-        <div className="flex gap-2">
-          <div className="flex-1 min-w-0 sm:flex-none">
-            <GroupByToggle value={groupBy} onChange={handleGroupByChange} />
-          </div>
-          <div className="flex-1 min-w-0 sm:flex-none">{itemDynamic}</div>
         </div>
       </div>
 
@@ -241,9 +291,9 @@ export default function ItemPage() {
             <div key={item.item_id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="font-semibold text-gray-900 text-sm">{item.description}</h3>
+                  <h3 className="font-semibold text-gray-900 text-sm">{item.item_code}</h3>
                   <p className="text-xs text-gray-400">
-                    {item.item_code}
+                    {item.description || "No description available"}
                     {item.item_group ? ` · ${item.item_group}` : ''}
                     {item.item_type ? ` · ${item.item_type}` : ''}
                   </p>
@@ -256,10 +306,6 @@ export default function ItemPage() {
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wide">Unit Price</p>
                     <p className="font-semibold text-gray-900">{formatAmount(item.unit_price)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wide">Qty Sold</p>
-                    <p className="font-semibold text-gray-900">{item.qty_sold.toLocaleString()}</p>
                   </div>
                 </div>
               </div>

@@ -14,13 +14,20 @@ interface Props {
   placeholder: string    // e.g. "All Branches"
   onChange: (value: string) => void
   ariaLabel: string
+  // Default (false): sizes to content on desktop (sm:w-auto) — right for a
+  // flex-wrap row where fields sit at their natural width. Set true when
+  // the parent is itself giving this a specific width to fill (e.g. a grid
+  // column) — otherwise only the invisible root stretches while the
+  // visible bordered input stays at its intrinsic width, leaving the
+  // chevron detached out past the input's right edge.
+  fullWidth?: boolean
 }
 
 // Click it → full list, same as a plain <select>. Type → live-filters the
 // list by name. Click/Enter an option (or the "All X" row) to choose it.
 // Replaces the FilterBar's plain <select> fields so "select or type" is a
 // real search, not just the browser's default select-jumps-on-keypress.
-export default function Combobox({ value, options, placeholder, onChange, ariaLabel }: Props) {
+export default function Combobox({ value, options, placeholder, onChange, ariaLabel, fullWidth = false }: Props) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [highlight, setHighlight] = useState(0)
@@ -81,7 +88,7 @@ export default function Combobox({ value, options, placeholder, onChange, ariaLa
   const displayValue = open ? query : (selected?.name ?? '')
 
   return (
-    <div ref={rootRef} className="relative w-full sm:w-auto">
+    <div ref={rootRef} className={`relative w-full ${fullWidth ? '' : 'sm:w-auto'}`}>
       <input
         ref={inputRef}
         type="text"
@@ -94,7 +101,7 @@ export default function Combobox({ value, options, placeholder, onChange, ariaLa
         onClick={openList}
         onChange={(e) => { setQuery(e.target.value); setOpen(true); setHighlight(0) }}
         onKeyDown={onKeyDown}
-        className="h-9 min-w-0 w-full sm:w-auto pl-3 pr-16 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-gray-700"
+        className={`h-9 min-w-0 w-full ${fullWidth ? '' : 'sm:w-auto'} pl-3 pr-16 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder:text-gray-700`}
       />
       <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
         {value && (

@@ -62,10 +62,15 @@ export interface CurrencyPivotRow {
 // bar/line per entity instead of one per (entity, currency) pair — while
 // keeping each currency's actual revenue and qty in `breakdown` so a tooltip
 // can still show "USD: $300 · Qty 40" / "MYR: RM200 · Qty 15" separately.
+// `foldOther`: when the row count exceeds `limit`, fold the remainder into a
+// trailing "Other" bucket instead of silently dropping them (Dashboard's
+// "Top 5 + Other" chart); Performance's charts leave this off and just cut
+// at `limit`.
 export function pivotRevenueByCurrency<T extends { currency: string; total_revenue: number; total_qty: number }>(
   rows: T[],
   nameOf: (row: T) => string,
-  limit?: number
+  limit?: number,
+  foldOther = false
 ): CurrencyPivotRow[] {
   const map = new Map<string, CurrencyPivotRow>()
   for (const row of rows) {
@@ -76,136 +81,81 @@ export function pivotRevenueByCurrency<T extends { currency: string; total_reven
     map.set(name, entry)
   }
   let data = [...map.values()].sort((a, b) => b.total - a.total)
-  if (limit) data = data.slice(0, limit)
+  if (limit && data.length > limit) {
+    const top = data.slice(0, limit)
+    const rest = data.slice(limit)
+    if (!foldOther) {
+      data = top
+    } else {
+      const other: CurrencyPivotRow = { name: 'Other', total: 0, breakdown: [] }
+      const byCurrency = new Map<string, CurrencyBreakdown>()
+      for (const row of rest) {
+        other.total += row.total
+        for (const b of row.breakdown) {
+          const entry = byCurrency.get(b.currency) ?? { currency: b.currency, revenue: 0, qty: 0 }
+          entry.revenue += b.revenue
+          entry.qty += b.qty
+          byCurrency.set(b.currency, entry)
+        }
+      }
+      other.breakdown = [...byCurrency.values()]
+      data = [...top, other]
+    }
+  }
   return data
 }
 
 export const CHART_PALETTE = ['#F2AA24', '#5B8DEF', '#00D697', '#E85D75', '#9B59B6', '#F39C12']
 
-// Paid/Not-due/Overdue status colors, shared by every stacked/multi-line
-// chart (Dashboard "Revenue by Item", Monthly trend) — see PLAN.md Section 4.
-// Paid reuses the brand color; Overdue reuses the existing danger color;
-// Not-due is a new neutral in between the two.
-export const STATUS_COLORS = {
-  paid: '#F2AA24',
-  notDue: '#94A3B8',
-  overdue: '#D90000',
+// Cash/Credit colors, shared by every Cash/Credit chart (Monthly trend).
+export const CASH_CREDIT_COLORS = {
+  cash: '#F2AA24',
+  credit: '#5B8DEF',
 }
 
-export interface StatusBreakdown {
+export interface CashCreditBreakdown {
   currency: string
-  paid: number
-  notDue: number
-  overdue: number
-  qtyPaid: number
-  qtyNotDue: number
-  qtyOverdue: number
+  cash: number
+  credit: number
 }
 
-export interface StatusPivotRow {
+export interface CashCreditPivotRow {
   name: string
   // Magnitudes only (summed across currencies, no FX conversion) — used for
-  // bar/line height and top-N ranking. Real per-currency numbers live in
-  // `breakdown`, for the tooltip.
-  paid: number
-  notDue: number
-  overdue: number
+  // line height. Real per-currency numbers live in `breakdown`, for the
+  // tooltip.
+  cash: number
+  credit: number
   total: number
-  breakdown: StatusBreakdown[]
+  breakdown: CashCreditBreakdown[]
 }
 
-interface StatusRow {
+interface CashCreditRevenueRow {
   currency: string
-  revenue_paid: number
-  revenue_not_due: number
-  revenue_overdue: number
-  qty_paid: number
-  qty_not_due: number
-  qty_overdue: number
+  cash_revenue: number
+  credit_revenue: number
 }
 
-// Pivots (bucket, currency, paid/notDue/overdue) rows into one row per
-// bucket (one bar per item/group/type instead of one per (bucket, currency)
-// pair). When `limit` is given, keeps the top N buckets by total magnitude
-// and folds everything else into a single "Other" bucket — used for the
-// Dashboard/Performance "Top 5 + Other" charts (PLAN.md Section 4).
-export function pivotItemRevenue<T extends StatusRow>(
-  rows: T[],
-  nameOf: (row: T) => string,
-  limit?: number
-): StatusPivotRow[] {
-  const map = new Map<string, StatusPivotRow>()
-  for (const row of rows) {
-    const name = nameOf(row)
-    const entry = map.get(name) ?? { name, paid: 0, notDue: 0, overdue: 0, total: 0, breakdown: [] }
-    entry.paid += row.revenue_paid
-    entry.notDue += row.revenue_not_due
-    entry.overdue += row.revenue_overdue
-    entry.total += row.revenue_paid + row.revenue_not_due + row.revenue_overdue
-    entry.breakdown.push({
-      currency: row.currency,
-      paid: row.revenue_paid, notDue: row.revenue_not_due, overdue: row.revenue_overdue,
-      qtyPaid: row.qty_paid, qtyNotDue: row.qty_not_due, qtyOverdue: row.qty_overdue,
-    })
-    map.set(name, entry)
-  }
-  let data = [...map.values()].sort((a, b) => b.total - a.total)
-  if (limit && data.length > limit) {
-    const top = data.slice(0, limit)
-    const rest = data.slice(limit)
-    const other: StatusPivotRow = { name: 'Other', paid: 0, notDue: 0, overdue: 0, total: 0, breakdown: [] }
-    const byCurrency = new Map<string, StatusBreakdown>()
-    for (const row of rest) {
-      other.paid += row.paid
-      other.notDue += row.notDue
-      other.overdue += row.overdue
-      other.total += row.total
-      for (const b of row.breakdown) {
-        const entry = byCurrency.get(b.currency) ?? { currency: b.currency, paid: 0, notDue: 0, overdue: 0, qtyPaid: 0, qtyNotDue: 0, qtyOverdue: 0 }
-        entry.paid += b.paid; entry.notDue += b.notDue; entry.overdue += b.overdue
-        entry.qtyPaid += b.qtyPaid; entry.qtyNotDue += b.qtyNotDue; entry.qtyOverdue += b.qtyOverdue
-        byCurrency.set(b.currency, entry)
-      }
-    }
-    other.breakdown = [...byCurrency.values()]
-    data = rest.length > 0 ? [...top, other] : top
-  }
-  return data
-}
-
-interface StatusRevenueRow {
-  currency: string
-  revenue_paid: number
-  revenue_not_due: number
-  revenue_overdue: number
-}
-
-// Same status pivot, but chronological (by year/month) rather than ranked by
+// Cash/Credit pivot, chronological (by year/month) rather than ranked by
 // magnitude — for the Monthly Sales trend chart, which needs its months in
-// order, not sorted by size. Revenue only (no qty) since the monthly trend
-// RPC doesn't track quantity.
-export function pivotMonthlyTrend<T extends StatusRevenueRow & { year: number; month: number }>(
+// order, not sorted by size.
+export function pivotMonthlyTrend<T extends CashCreditRevenueRow & { year: number; month: number }>(
   rows: T[],
   monthNames: string[]
-): StatusPivotRow[] {
+): CashCreditPivotRow[] {
   const order: string[] = []
-  const byMonth = new Map<string, StatusPivotRow>()
+  const byMonth = new Map<string, CashCreditPivotRow>()
   for (const row of rows) {
     const key = `${row.year}-${row.month}`
     if (!byMonth.has(key)) {
-      byMonth.set(key, { name: `${monthNames[row.month]} ${row.year}`, paid: 0, notDue: 0, overdue: 0, total: 0, breakdown: [] })
+      byMonth.set(key, { name: `${monthNames[row.month]} ${row.year}`, cash: 0, credit: 0, total: 0, breakdown: [] })
       order.push(key)
     }
     const entry = byMonth.get(key)!
-    entry.paid += row.revenue_paid
-    entry.notDue += row.revenue_not_due
-    entry.overdue += row.revenue_overdue
-    entry.total += row.revenue_paid + row.revenue_not_due + row.revenue_overdue
-    entry.breakdown.push({
-      currency: row.currency,
-      paid: row.revenue_paid, notDue: row.revenue_not_due, overdue: row.revenue_overdue,
-      qtyPaid: 0, qtyNotDue: 0, qtyOverdue: 0,
-    })
+    entry.cash += row.cash_revenue
+    entry.credit += row.credit_revenue
+    entry.total += row.cash_revenue + row.credit_revenue
+    entry.breakdown.push({ currency: row.currency, cash: row.cash_revenue, credit: row.credit_revenue })
   }
   return order.map((k) => byMonth.get(k)!)
 }

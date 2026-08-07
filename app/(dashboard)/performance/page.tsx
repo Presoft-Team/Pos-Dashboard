@@ -2,18 +2,20 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/db/client'
-import { FilterOptions, Filters, GroupByMode, PerformanceRow } from '@/types'
-import { DEFAULT_FILTERS, DEFAULT_OPTIONS, toParams } from '@/lib/filters'
+import { GroupByMode, PerformanceRow } from '@/types'
+import { toParams } from '@/lib/filters'
+import { useSharedFilters } from '@/lib/filter-context'
 import { pivotRevenueByCurrency } from '@/lib/currency'
 import { entityRevenueColumns } from '@/lib/export'
 import FilterBar from '@/components/filter-bar'
 import CurrencyFilter from '@/components/currency-filter'
+import DatePresetFilter from '@/components/date-preset-filter'
 import BarChartWidget from '@/components/bar-chart'
 import PerformanceTable from '@/components/performance-table'
 import ExportModal, { ExportChartSpec, ExportTableSpec } from '@/components/export-modal'
 import { Download } from 'lucide-react'
 
-const ENTITY_FIELDS = ['branch', 'item', 'sales_agent', 'debtor', 'creditor'] as const
+const ENTITY_FIELDS = ['branch', 'item', 'sales_agent', 'debtor'] as const
 type EntityField = (typeof ENTITY_FIELDS)[number]
 
 const GROUP_LABEL: Record<GroupByMode, string> = { item: 'Item', group: 'Group', type: 'Type' }
@@ -31,18 +33,14 @@ function chartData(rows: PerformanceRow[]) {
 export default function PerformancePage() {
   const supabase = createClient()
 
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
-  const [options, setOptions] = useState<FilterOptions>(DEFAULT_OPTIONS)
-  const [groupBy, setGroupBy] = useState<GroupByMode>('item')
+  const { filters, setFilters, groupBy, setGroupBy, options } = useSharedFilters()
   const [branchRows, setBranchRows] = useState<PerformanceRow[]>([])
   const [itemRows, setItemRows] = useState<PerformanceRow[]>([])
   const [agentRows, setAgentRows] = useState<PerformanceRow[]>([])
   const [debtorRows, setDebtorRows] = useState<PerformanceRow[]>([])
-  const [creditorRows, setCreditorRows] = useState<PerformanceRow[]>([])
   const [loading, setLoading] = useState(true)
   const [exportOpen, setExportOpen] = useState(false)
 
-  useEffect(() => { fetchOptions() }, [])
   useEffect(() => { fetchData() }, [filters, groupBy])
 
   // FilterBar's Item/Group/Type slot swaps meaning with the toggle — clear
@@ -53,30 +51,24 @@ export default function PerformancePage() {
     setFilters((f) => ({ ...f, item: '', item_group: '', item_type: '' }))
   }
 
-  async function fetchOptions() {
-    const { data } = await supabase.rpc('get_filter_options_v2')
-    if (data?.[0]) setOptions(data[0] as FilterOptions)
-  }
-
   async function fetchData() {
     setLoading(true)
-    // All 5 functions now accept every entity filter, including their own
+    // All 4 functions now accept every entity filter, including their own
     // dimension — filtering by "Ah Chong" collapses the Sales Agent table
-    // to just his row too, not only the other 4.
+    // to just his row too, not only the other 3.
     // p_limit defaults to 5 server-side (it feeds the "Top 5" chart) — the
     // breakdown tables need the full set, so pass null (= no LIMIT) here and
     // let chartData() above re-slice down to 5 for the chart only.
     const p = { ...toParams(filters), p_limit: null }
 
-    const [branchRes, itemRes, agentRes, debtorRes, creditorRes] = await Promise.all([
+    const [branchRes, itemRes, agentRes, debtorRes] = await Promise.all([
       supabase.rpc('get_performance_branch_v2', p),
       supabase.rpc('get_performance_item_v2', { ...p, p_group_by: groupBy }),
       supabase.rpc('get_performance_sales_agent_v2', p),
       supabase.rpc('get_performance_debtor_v2', p),
-      supabase.rpc('get_performance_creditor_v2', p),
     ])
 
-    for (const [label, res] of [['branch', branchRes], ['item', itemRes], ['sales_agent', agentRes], ['debtor', debtorRes], ['creditor', creditorRes]] as const) {
+    for (const [label, res] of [['branch', branchRes], ['item', itemRes], ['sales_agent', agentRes], ['debtor', debtorRes]] as const) {
       if (res.error) console.error(`get_performance_${label}_v2 error:`, res.error.message)
     }
 
@@ -84,7 +76,6 @@ export default function PerformancePage() {
     setItemRows((itemRes.data as PerformanceRow[]) ?? [])
     setAgentRows((agentRes.data as PerformanceRow[]) ?? [])
     setDebtorRows((debtorRes.data as PerformanceRow[]) ?? [])
-    setCreditorRows((creditorRes.data as PerformanceRow[]) ?? [])
     setLoading(false)
   }
 
@@ -94,13 +85,17 @@ export default function PerformancePage() {
     { field: 'branch', title: 'Branch Breakdown', rows: branchRows },
     { field: 'sales_agent', title: 'Sales Agent Breakdown', rows: agentRows },
     { field: 'debtor', title: 'Debtor Breakdown', rows: debtorRows },
-    { field: 'creditor', title: 'Creditor Breakdown', rows: creditorRows },
   ]
+  // A dimension with no rows for the current filters has nothing to chart
+  // or table, so it hides itself — while loading, keep every section
+  // rendered (with its own spinner) since rows are just empty-so-far, not
+  // empty-for-real yet.
+  const visibleSections = loading ? sections : sections.filter((s) => s.rows.length > 0)
 
-  const exportCharts: ExportChartSpec[] = sections.map((s) => ({
+  const exportCharts: ExportChartSpec[] = visibleSections.map((s) => ({
     id: `${s.field}-chart`, label: `Top 5 ${s.title}`, render: () => <BarChartWidget data={chartData(s.rows)} />,
   }))
-  const exportTables: ExportTableSpec[] = sections.map((s) => ({
+  const exportTables: ExportTableSpec[] = visibleSections.map((s) => ({
     id: `${s.field}-table`, label: s.title,
     columns: entityRevenueColumns('name', s.field === 'item' ? itemLabel : s.title.split(' Breakdown')[0]),
     rows: s.rows as unknown as Record<string, unknown>[],
@@ -111,7 +106,7 @@ export default function PerformancePage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Performance</h1>
-          <p className="text-sm text-gray-500">Branch, Item, Sales Agent, Debtor, and Creditor performance</p>
+          <p className="text-sm text-gray-500">Branch, Item, Sales Agent, and Debtor performance</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <FilterBar
@@ -120,13 +115,22 @@ export default function PerformancePage() {
             onChange={setFilters}
             groupBy={groupBy}
             onGroupByChange={handleGroupByChange}
+            datePicker={<DatePresetFilter filters={filters} options={options} onChange={setFilters} />}
             trailing={[
-              <CurrencyFilter
-                key="currency"
-                value={filters.currency}
-                options={options.currencies}
-                onChange={(v) => setFilters({ ...filters, currency: v })}
-              />,
+              // Omitted entirely (not just left to CurrencyFilter's own
+              // null-render) when there's only 0/1 currency — a rendered-
+              // but-empty slot still occupies a mobile grid cell, leaving a
+              // real gap instead of letting Export slide into it.
+              ...(options.currencies.length > 1
+                ? [
+                    <CurrencyFilter
+                      key="currency"
+                      value={filters.currency}
+                      options={options.currencies}
+                      onChange={(v) => setFilters({ ...filters, currency: v })}
+                    />,
+                  ]
+                : []),
               <button
                 key="export"
                 onClick={() => setExportOpen(true)}
@@ -142,7 +146,7 @@ export default function PerformancePage() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {sections.map((s) => (
+        {visibleSections.map((s) => (
           <div key={s.field} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <h3 className="font-semibold text-gray-900 text-sm mb-4">Top 5 {s.title}</h3>
             {loading ? (
@@ -158,7 +162,7 @@ export default function PerformancePage() {
 
       {/* Tables */}
       <div className="space-y-4">
-        {sections.map((s) => (
+        {visibleSections.map((s) => (
           <PerformanceTable key={s.field} title={s.title} rows={s.rows} loading={loading} />
         ))}
       </div>

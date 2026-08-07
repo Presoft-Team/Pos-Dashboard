@@ -13,9 +13,9 @@ interface Props {
 const INITIAL_VISIBLE = 5
 const SHOW_MORE_STEP = 5
 
-// One of Performance's 5 breakdown tables (Branch/Item/Sales Agent/Debtor/
-// Creditor) — plain display, filtered only by the Global FilterBar above
-// (click-to-focus was removed).
+// One of Performance's 4 breakdown tables (Branch/Item/Sales Agent/Debtor)
+// — plain display, filtered only by the Global FilterBar above (click-to-
+// focus was removed).
 export default function PerformanceTable({ title, rows, loading }: Props) {
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
 

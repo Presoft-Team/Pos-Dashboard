@@ -23,7 +23,7 @@ export async function getItemBestSellers(params: BestSellersParams) {
       CASE @p_group_by
         WHEN 'group' THEN COALESCE(i.ItemGroup, 'Ungrouped')
         WHEN 'type'  THEN COALESCE(i.ItemType, 'Untyped')
-        ELSE i.Description
+        ELSE i.ItemCode
       END AS bucket_name,
       s.currency,
       COALESCE(SUM(CASE WHEN s.is_credit = 1 THEN s.quantity ELSE 0 END), 0) AS credit_qty,
@@ -37,7 +37,7 @@ export async function getItemBestSellers(params: BestSellersParams) {
       CASE @p_group_by
         WHEN 'group' THEN COALESCE(i.ItemGroup, 'Ungrouped')
         WHEN 'type'  THEN COALESCE(i.ItemType, 'Untyped')
-        ELSE i.Description
+        ELSE i.ItemCode
       END,
       s.currency
     ORDER BY (COALESCE(SUM(s.revenue), 0)) DESC;

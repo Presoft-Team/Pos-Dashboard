@@ -11,7 +11,6 @@ export interface CommonParams {
   p_item?: string | null
   p_sales_agent?: string | null
   p_debtor?: string | null
-  p_creditor?: string | null
   p_item_group?: string | null
   p_item_type?: string | null
   p_currency?: string | null
@@ -28,7 +27,6 @@ export function bindCommonParams(request: sql.Request, p: CommonParams) {
   request.input('p_item', sql.NVarChar(50), p.p_item ?? null)
   request.input('p_sales_agent', sql.NVarChar(50), p.p_sales_agent ?? null)
   request.input('p_debtor', sql.NVarChar(50), p.p_debtor ?? null)
-  request.input('p_creditor', sql.NVarChar(50), p.p_creditor ?? null)
   request.input('p_item_group', sql.NVarChar(100), p.p_item_group ?? null)
   request.input('p_item_type', sql.NVarChar(100), p.p_item_type ?? null)
   request.input('p_currency', sql.NVarChar(10), p.p_currency ?? null)
