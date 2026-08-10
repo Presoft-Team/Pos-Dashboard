@@ -15,7 +15,7 @@ export const monthlyRouter = Router()
  *     parameters:
  *       - $ref: '#/components/parameters/date_from'
  *       - $ref: '#/components/parameters/date_to'
- *       - $ref: '#/components/parameters/branch'
+ *       - $ref: '#/components/parameters/location'
  *       - $ref: '#/components/parameters/item'
  *       - $ref: '#/components/parameters/sales_agent'
  *       - $ref: '#/components/parameters/debtor'
@@ -60,7 +60,7 @@ monthlyRouter.get('/sales/monthly-trend', async (req, res, next) => {
  *     parameters:
  *       - $ref: '#/components/parameters/date_from'
  *       - $ref: '#/components/parameters/date_to'
- *       - $ref: '#/components/parameters/branch'
+ *       - $ref: '#/components/parameters/location'
  *       - $ref: '#/components/parameters/item'
  *       - $ref: '#/components/parameters/sales_agent'
  *       - $ref: '#/components/parameters/debtor'

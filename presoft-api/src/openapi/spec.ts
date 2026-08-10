@@ -7,7 +7,7 @@ import path from 'node:path'
 const commonFilterParams = {
   date_from: { name: 'date_from', in: 'query', schema: { type: 'string', format: 'date' }, description: 'Inclusive lower bound on order date (YYYY-MM-DD).' },
   date_to: { name: 'date_to', in: 'query', schema: { type: 'string', format: 'date' }, description: 'Inclusive upper bound on order date (YYYY-MM-DD).' },
-  branch: { name: 'branch', in: 'query', schema: { type: 'string' }, description: 'Branch code (Branch.BranchCode).' },
+  location: { name: 'location', in: 'query', schema: { type: 'string' }, description: 'Location code (Location.Location). Filters sales/purchase docs by their own SalesLocation/PurchaseLocation, and the item catalog by StockDTL location — replaced the old Branch-code filter entirely.' },
   item: { name: 'item', in: 'query', schema: { type: 'string' }, description: 'Item code (Item.ItemCode).' },
   sales_agent: { name: 'sales_agent', in: 'query', schema: { type: 'string' }, description: 'Sales agent code (SalesAgent.SalesAgent).' },
   debtor: { name: 'debtor', in: 'query', schema: { type: 'string' }, description: 'Debtor account number (Debtor.AccNo).' },

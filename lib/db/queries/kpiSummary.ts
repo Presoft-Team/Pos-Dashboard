@@ -1,10 +1,12 @@
 // Real equivalent of rpc_v2.sql's get_kpi_summary_v2() — Sales Dashboard
 // KPI cards. Revenue split Cash/Credit (paid status not a factor here —
-// see PLAN.md §3) x currency, plus total purchase amount (actual PI/PIDTL
-// spend, not an estimated COGS figure). Sales and purchases are filtered
-// and grouped independently, then combined by currency — a currency with
-// sales but no purchases (or vice versa) still gets one row via the FULL
-// OUTER JOIN instead of disappearing from an INNER JOIN.
+// see PLAN.md §3) x currency, plus total purchase amount (PI + CP spend
+// netted against PR returns; PO excluded — not yet an actual purchase, and
+// purchases have no Cash/Credit split, just one combined total). Sales and
+// purchases are filtered and grouped independently, then combined by
+// currency — a currency with sales but no purchases (or vice versa) still
+// gets one row via the FULL OUTER JOIN instead of disappearing from an
+// INNER JOIN.
 import 'server-only'
 import { getRequest } from '@/lib/mssql'
 import { bindCommonParams, CommonParams } from '@/lib/db/params'
@@ -34,7 +36,7 @@ export async function getKpiSummary(params: CommonParams) {
       WHERE
         (@p_date_from IS NULL OR pu.order_date >= @p_date_from)
         AND (@p_date_to IS NULL OR pu.order_date <= @p_date_to)
-        AND (@p_branch IS NULL OR pu.branch_id = @p_branch)
+        AND (@p_location IS NULL OR pu.location_id = @p_location)
         AND (@p_item IS NULL OR pu.item_id = @p_item)
         AND (@p_item_group IS NULL OR i.ItemGroup = @p_item_group)
         AND (@p_item_type IS NULL OR i.ItemType = @p_item_type)

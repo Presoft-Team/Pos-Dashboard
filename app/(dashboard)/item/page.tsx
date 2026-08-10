@@ -16,9 +16,15 @@ interface ItemGroup {
   description: string
   item_group: string | null
   item_type: string | null
-  cost: number         // one value per item, same across every branch
+  // Single value per item — from ItemUOM's BaseUOM Cost/Price, same for
+  // every location/UOM/batch row that item has (see sql-fragments.ts's
+  // ITEM_BASE_REF_CTE), so it's hoisted here instead of repeated per row.
+  cost: number
   unit_price: number
-  branches: { branch_name: string; qty_on_hand: number }[]
+  locations: {
+    location_name: string | null
+    qty_on_hand: number
+  }[]
 }
 
 function groupByItem(rows: ItemCatalogRow[]): ItemGroup[] {
@@ -27,9 +33,11 @@ function groupByItem(rows: ItemCatalogRow[]): ItemGroup[] {
     const entry = map.get(row.item_id) ?? {
       item_id: row.item_id, item_code: row.item_code, description: row.description,
       item_group: row.item_group, item_type: row.item_type,
-      cost: row.cost, unit_price: row.unit_price, branches: [],
+      cost: row.cost, unit_price: row.unit_price, locations: [],
     }
-    if (row.branch_name) entry.branches.push({ branch_name: row.branch_name, qty_on_hand: row.qty_on_hand })
+    entry.locations.push({
+      location_name: row.location_name, qty_on_hand: row.qty_on_hand,
+    })
     map.set(row.item_id, entry)
   }
   return [...map.values()]
@@ -43,18 +51,18 @@ const SORT_OPTIONS = [
   { value: 'price_asc', label: 'Unit Price: Low to High' },
 ] as const
 
-const BRANCH_TABLE_INITIAL_VISIBLE = 5
-const BRANCH_TABLE_SHOW_MORE_STEP = 5
+const LOCATION_TABLE_INITIAL_VISIBLE = 5
+const LOCATION_TABLE_SHOW_MORE_STEP = 5
 
-// Per-item branch stock table — needs its own expand/collapse state per
+// Per-item stock-location table — needs its own expand/collapse state per
 // item card, hence a separate component rather than inline JSX in the
 // items.map() below.
-function BranchStockTable({ branches }: { branches: ItemGroup['branches'] }) {
-  const [visibleCount, setVisibleCount] = useState(BRANCH_TABLE_INITIAL_VISIBLE)
+function LocationStockTable({ locations }: { locations: ItemGroup['locations'] }) {
+  const [visibleCount, setVisibleCount] = useState(LOCATION_TABLE_INITIAL_VISIBLE)
 
-  const visibleBranches = branches.slice(0, visibleCount)
-  const hasMore = visibleCount < branches.length
-  const isExpanded = visibleCount > BRANCH_TABLE_INITIAL_VISIBLE
+  const visibleLocations = locations.slice(0, visibleCount)
+  const hasMore = visibleCount < locations.length
+  const isExpanded = visibleCount > LOCATION_TABLE_INITIAL_VISIBLE
 
   return (
     <>
@@ -62,15 +70,15 @@ function BranchStockTable({ branches }: { branches: ItemGroup['branches'] }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 text-left">
-              <th className="px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Branch</th>
+              <th className="px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Location</th>
               <th className="px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Qty on Hand</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {visibleBranches.map((b, i) => (
+            {visibleLocations.map((l, i) => (
               <tr key={i}>
-                <td className="px-4 py-2.5 text-gray-700">{b.branch_name}</td>
-                <td className="px-4 py-2.5 text-right text-gray-700">{b.qty_on_hand.toLocaleString()}</td>
+                <td className="px-4 py-2.5 text-gray-700">{l.location_name ?? '—'}</td>
+                <td className="px-4 py-2.5 text-right text-gray-700">{l.qty_on_hand.toLocaleString()}</td>
               </tr>
             ))}
           </tbody>
@@ -81,7 +89,7 @@ function BranchStockTable({ branches }: { branches: ItemGroup['branches'] }) {
         <div className="flex items-center justify-center gap-3 px-5 py-3 border-t border-gray-100">
           {hasMore && (
             <button
-              onClick={() => setVisibleCount((c) => Math.min(c + BRANCH_TABLE_SHOW_MORE_STEP, branches.length))}
+              onClick={() => setVisibleCount((c) => Math.min(c + LOCATION_TABLE_SHOW_MORE_STEP, locations.length))}
               className="text-sm font-medium text-brand hover:text-brand/80 transition-colors"
             >
               Show 5 more
@@ -89,7 +97,7 @@ function BranchStockTable({ branches }: { branches: ItemGroup['branches'] }) {
           )}
           {hasMore && (
             <button
-              onClick={() => setVisibleCount(branches.length)}
+              onClick={() => setVisibleCount(locations.length)}
               className="text-sm font-medium text-brand hover:text-brand/80 transition-colors"
             >
               Show all
@@ -97,7 +105,7 @@ function BranchStockTable({ branches }: { branches: ItemGroup['branches'] }) {
           )}
           {isExpanded && (
             <button
-              onClick={() => setVisibleCount(BRANCH_TABLE_INITIAL_VISIBLE)}
+              onClick={() => setVisibleCount(LOCATION_TABLE_INITIAL_VISIBLE)}
               className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
             >
               Show less
@@ -130,7 +138,7 @@ export default function ItemPage() {
     const t = setTimeout(fetchData, 300)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, sort, filters.branch, filters.item, filters.item_group, filters.item_type])
+  }, [search, sort, filters.location, filters.item, filters.item_group, filters.item_type])
 
   // The Item/Group/Type toggle swaps which of the 3 fields the dynamic
   // combobox filters by — clear the other two so switching modes doesn't
@@ -150,7 +158,7 @@ export default function ItemPage() {
       p_item: filters.item || null,
       p_item_group: filters.item_group || null,
       p_item_type: filters.item_type || null,
-      p_branch: filters.branch || null,
+      p_location: filters.location || null,
       p_sort: sort,
       p_limit: null,
     })
@@ -201,10 +209,10 @@ export default function ItemPage() {
         </p>
       </div>
 
-      {/* Filters — mobile: Search / Sort(60%)+Branch(40%) / Toggle+Item, each
-          its own row; desktop: single wrapped line. Different enough splits
-          (mobile pairs Branch with Sort, desktop pairs Branch with Search)
-          that it's two layouts, same pattern as FilterBar. */}
+      {/* Filters — mobile: Search / Sort(60%)+Location(40%) / Toggle+Item,
+          each its own row; desktop: single wrapped line. Different enough
+          splits (mobile pairs Location with Sort, desktop pairs Location
+          with Search) that it's two layouts, same pattern as FilterBar. */}
       <div className="sm:hidden space-y-2">
         <div className="relative w-full">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -222,11 +230,11 @@ export default function ItemPage() {
           </div>
           <div className="min-w-0">
             <Combobox
-              value={filters.branch}
-              onChange={(v) => setFilters({ ...filters, branch: v })}
-              options={options.branches}
-              placeholder="All Branches"
-              ariaLabel="Branch"
+              value={filters.location}
+              onChange={(v) => setFilters({ ...filters, location: v })}
+              options={options.locations}
+              placeholder="All Locations"
+              ariaLabel="Location"
               fullWidth
             />
           </div>
@@ -256,8 +264,8 @@ export default function ItemPage() {
             <SortSelect value={sort} options={SORT_OPTIONS} onChange={setSort} ariaLabel="Sort by" />
           </div>
         </div>
-        {/* Toggle 20% / Item-Group-Type combobox 40% / Branch 40% — each grid
-            child wrapped in min-w-0, otherwise a grid item's default
+        {/* Toggle 20% / Item-Group-Type combobox 40% / Location 40% — each
+            grid child wrapped in min-w-0, otherwise a grid item's default
             min-width is its content's intrinsic width, which overflows the
             cell instead of shrinking once the track gets this narrow. */}
         <div className="grid grid-cols-[2fr_4fr_4fr] gap-2">
@@ -267,11 +275,11 @@ export default function ItemPage() {
           <div className="min-w-0">{itemDynamic}</div>
           <div className="min-w-0">
             <Combobox
-              value={filters.branch}
-              onChange={(v) => setFilters({ ...filters, branch: v })}
-              options={options.branches}
-              placeholder="All Branches"
-              ariaLabel="Branch"
+              value={filters.location}
+              onChange={(v) => setFilters({ ...filters, location: v })}
+              options={options.locations}
+              placeholder="All Locations"
+              ariaLabel="Location"
               fullWidth
             />
           </div>
@@ -289,7 +297,7 @@ export default function ItemPage() {
         <div className="space-y-4">
           {items.slice(0, visibleItemCount).map((item) => (
             <div key={item.item_id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+              <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-4">
                 <div>
                   <h3 className="font-semibold text-gray-900 text-sm">{item.item_code}</h3>
                   <p className="text-xs text-gray-400">
@@ -298,22 +306,16 @@ export default function ItemPage() {
                     {item.item_type ? ` · ${item.item_type}` : ''}
                   </p>
                 </div>
-                <div className="flex gap-6 text-right">
-                  <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wide">Cost</p>
-                    <p className="font-semibold text-gray-900">{formatAmount(item.cost)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400 uppercase tracking-wide">Unit Price</p>
-                    <p className="font-semibold text-gray-900">{formatAmount(item.unit_price)}</p>
-                  </div>
+                <div className="text-right shrink-0 text-xs">
+                  <p className="text-gray-400">Cost <span className="text-gray-700 font-medium">{formatAmount(item.cost)}</span></p>
+                  <p className="text-gray-400">Price <span className="text-gray-700 font-medium">{formatAmount(item.unit_price)}</span></p>
                 </div>
               </div>
 
-              {item.branches.length > 0 ? (
-                <BranchStockTable branches={item.branches} />
+              {item.locations.length > 0 ? (
+                <LocationStockTable locations={item.locations} />
               ) : (
-                <p className="px-5 py-3 text-xs text-gray-400">No branch stock recorded</p>
+                <p className="px-5 py-3 text-xs text-gray-400">No stock location recorded</p>
               )}
             </div>
           ))}

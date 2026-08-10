@@ -1,5 +1,5 @@
 // Real equivalents of rpc_v2.sql's 4 get_performance_*_v2() functions —
-// Performance page's Branch/Item/Sales Agent/Debtor breakdowns.
+// Performance page's Location/Item/Sales Agent/Debtor breakdowns.
 // Every function accepts all 4 entity filters, including its own dimension
 // (see rpc_v2.sql's original comment — filtering by "Ah Chong" collapses
 // the Sales Agent table to just his row too, not only the other 3).
@@ -24,23 +24,23 @@ function effectiveLimit(p_limit: number | null | undefined): number {
   return typeof p_limit === 'number' && Number.isFinite(p_limit) ? p_limit : NO_LIMIT
 }
 
-export async function getPerformanceBranch(params: LimitParams) {
+export async function getPerformanceLocation(params: LimitParams) {
   const request = await getRequest()
   bindCommonParams(request, params)
   request.input('p_limit', sql.Int, effectiveLimit(params.p_limit))
   const result = await request.query(`
     WITH ${SALES_CTE}
     SELECT TOP (@p_limit)
-      b.BranchCode AS id, b.BranchCode AS name, s.currency,
+      loc.Location AS id, COALESCE(loc.Description, loc.Location) AS name, s.currency,
       COALESCE(SUM(CASE WHEN s.is_credit = 1 THEN s.quantity ELSE 0 END), 0) AS credit_qty,
       COALESCE(SUM(CASE WHEN s.is_credit = 0 THEN s.quantity ELSE 0 END), 0) AS cash_qty,
       COALESCE(SUM(CASE WHEN s.is_credit = 1 THEN s.revenue ELSE 0 END), 0) AS credit_revenue,
       COALESCE(SUM(CASE WHEN s.is_credit = 0 THEN s.revenue ELSE 0 END), 0) AS cash_revenue
     FROM sales s
-    JOIN Branch b ON b.BranchCode = s.branch_id
+    JOIN Location loc ON loc.Location = s.location_id
     JOIN Item i ON i.ItemCode = s.item_id
     WHERE ${salesCommonWhere('s')}
-    GROUP BY b.BranchCode, s.currency
+    GROUP BY loc.Location, loc.Description, s.currency
     ORDER BY (COALESCE(SUM(s.revenue), 0)) DESC;
   `)
   return result.recordset

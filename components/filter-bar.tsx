@@ -31,7 +31,7 @@ interface Props {
 }
 
 // Global FilterBar (PLAN.md Section 3) — shared by Sales Dashboard, Monthly
-// Sales, Performance, and Item pages. Date range + 4 entity fields (Branch,
+// Sales, Performance, and Item pages. Date range + 4 entity fields (Location,
 // Item, Sales Agent, Debtor) + Item Group/Item Type. Every field
 // except date range is a Combobox — click for the full list (same as a
 // plain <select>), or type to live-filter it by name. An entity field with
@@ -72,9 +72,9 @@ export default function FilterBar({ filters, options, onChange, groupBy = 'item'
       className={dateClass} aria-label="To date"
     />
   )
-  const hasBranch = options.branches.length > 0
-  const branch = (
-    <Combobox value={filters.branch} onChange={(v) => set('branch', v)} options={options.branches} placeholder="All Branches" ariaLabel="Branch" fullWidth />
+  const hasLocation = options.locations.length > 0
+  const location = (
+    <Combobox value={filters.location} onChange={(v) => set('location', v)} options={options.locations} placeholder="All Locations" ariaLabel="Location" fullWidth />
   )
   // One slot whose meaning follows the active Group By mode — Item, Item
   // Group, or Item Type — instead of showing all three at once. Hidden
@@ -121,9 +121,9 @@ export default function FilterBar({ filters, options, onChange, groupBy = 'item'
   // Same flat list on both breakpoints — toggle and the dynamic Item/Group/
   // Type field are separate cells (a shared cell was too cramped once the
   // desktop grid went to 5 columns/20% each; at that width each field
-  // needs its own cell, same as Branch/Sales Agent/Debtor).
+  // needs its own cell, same as Location/Sales Agent/Debtor).
   const entityFields: { key: string; node: ReactNode }[] = [
-    ...(hasBranch ? [{ key: 'branch', node: branch }] : []),
+    ...(hasLocation ? [{ key: 'location', node: location }] : []),
     ...(toggle ? [{ key: 'toggle', node: toggle }] : []),
     ...(hasItemDynamic ? [{ key: 'item', node: itemDynamic }] : []),
     ...(hasSalesAgent ? [{ key: 'salesAgent', node: salesAgent }] : []),

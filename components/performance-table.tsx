@@ -13,7 +13,7 @@ interface Props {
 const INITIAL_VISIBLE = 5
 const SHOW_MORE_STEP = 5
 
-// One of Performance's 4 breakdown tables (Branch/Item/Sales Agent/Debtor)
+// One of Performance's 4 breakdown tables (Location/Item/Sales Agent/Debtor)
 // — plain display, filtered only by the Global FilterBar above (click-to-
 // focus was removed).
 export default function PerformanceTable({ title, rows, loading }: Props) {
@@ -46,10 +46,9 @@ export default function PerformanceTable({ title, rows, loading }: Props) {
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide w-8">#</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Name</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Currency</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Credit Qty</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Cash Qty</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Credit Revenue</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Cash Revenue</th>
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Total</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -58,10 +57,9 @@ export default function PerformanceTable({ title, rows, loading }: Props) {
                   <td className="px-4 py-3 text-gray-400 font-medium">{i + 1}</td>
                   <td className="px-4 py-3 font-semibold text-gray-900">{row.name}</td>
                   <td className="px-4 py-3 text-gray-600">{row.currency}</td>
-                  <td className="px-4 py-3 text-right text-gray-700">{row.credit_qty.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-right text-gray-700">{row.cash_qty.toLocaleString()}</td>
                   <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(row.credit_revenue)}</td>
                   <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(row.cash_revenue)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(row.credit_revenue + row.cash_revenue)}</td>
                 </tr>
               ))}
             </tbody>

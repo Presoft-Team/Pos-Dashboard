@@ -21,3 +21,7 @@ dist/
 # internal planning docs & local SQL scripts — not for the public repo
 *.sql
 *.md
+
+
+# local development files
+refer/

@@ -6,7 +6,12 @@ export interface EntityOption {
 }
 
 export interface FilterOptions {
-  branches: EntityOption[]
+  // dbo.Location — unified across every page: Sales/Monthly/Performance
+  // filter sales/purchase docs by their own SalesLocation/PurchaseLocation,
+  // and Item filters stock by the same Location code (previously a
+  // page-local fetch via get_item_locations_v2, before "Branch" was
+  // replaced with "Location" as the shared filter dimension).
+  locations: EntityOption[]
   items: EntityOption[]
   sales_agents: EntityOption[]
   debtors: EntityOption[]
@@ -22,7 +27,7 @@ export interface FilterOptions {
 export interface Filters {
   date_from: string
   date_to: string
-  branch: string
+  location: string
   item: string
   sales_agent: string
   debtor: string
@@ -108,7 +113,10 @@ export interface ItemCatalogRow {
   description: string
   item_group: string | null
   item_type: string | null
-  branch_name: string | null
+  // dbo.Location — a separate master table/code space from Branch. StockDTL
+  // has no Branch column, so this is not the same as a sales-doc branch.
+  // qty_on_hand is summed across UOM/batch into one total per location.
+  location_name: string | null
   qty_on_hand: number
   cost: number
   unit_price: number
@@ -126,4 +134,9 @@ export interface CreditPaidInvoiceRow {
   due_date: string | null
   outstanding: number
   revenue: number
+}
+
+export interface RevenueJoinIntegrityRow {
+  check_name: string
+  orphan_count: number
 }

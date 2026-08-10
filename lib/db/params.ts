@@ -1,13 +1,13 @@
 // Shared param types/binding for every RPC-equivalent query. Param names
 // match what lib/filters.ts's toParams() already sends (p_date_from,
-// p_branch, ...) — client code needs zero changes for this reason.
+// p_location, ...) — client code needs zero changes for this reason.
 import 'server-only'
 import sql from 'mssql'
 
 export interface CommonParams {
   p_date_from?: string | null
   p_date_to?: string | null
-  p_branch?: string | null
+  p_location?: string | null
   p_item?: string | null
   p_sales_agent?: string | null
   p_debtor?: string | null
@@ -23,7 +23,7 @@ export interface CommonParams {
 export function bindCommonParams(request: sql.Request, p: CommonParams) {
   request.input('p_date_from', sql.Date, p.p_date_from ?? null)
   request.input('p_date_to', sql.Date, p.p_date_to ?? null)
-  request.input('p_branch', sql.NVarChar(50), p.p_branch ?? null)
+  request.input('p_location', sql.NVarChar(50), p.p_location ?? null)
   request.input('p_item', sql.NVarChar(50), p.p_item ?? null)
   request.input('p_sales_agent', sql.NVarChar(50), p.p_sales_agent ?? null)
   request.input('p_debtor', sql.NVarChar(50), p.p_debtor ?? null)

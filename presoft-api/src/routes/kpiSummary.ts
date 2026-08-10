@@ -14,7 +14,7 @@ export const kpiSummaryRouter = Router()
  *     parameters:
  *       - $ref: '#/components/parameters/date_from'
  *       - $ref: '#/components/parameters/date_to'
- *       - $ref: '#/components/parameters/branch'
+ *       - $ref: '#/components/parameters/location'
  *       - $ref: '#/components/parameters/item'
  *       - $ref: '#/components/parameters/sales_agent'
  *       - $ref: '#/components/parameters/debtor'
@@ -51,7 +51,7 @@ kpiSummaryRouter.get('/kpi-summary', async (req, res, next) => {
         WHERE
           (@date_from IS NULL OR pu.order_date >= @date_from)
           AND (@date_to IS NULL OR pu.order_date <= @date_to)
-          AND (@branch IS NULL OR pu.branch_id = @branch)
+          AND (@location IS NULL OR pu.location_id = @location)
           AND (@item IS NULL OR pu.item_id = @item)
           AND (@item_group IS NULL OR i.ItemGroup = @item_group)
           AND (@item_type IS NULL OR i.ItemType = @item_type)

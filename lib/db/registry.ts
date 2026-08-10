@@ -10,7 +10,7 @@ import { getItemBestSellers } from './queries/bestSellers'
 import { getMonthlyTrend } from './queries/monthlyTrend'
 import { getMonthlyBreakdown } from './queries/monthlyBreakdown'
 import {
-  getPerformanceBranch,
+  getPerformanceLocation,
   getPerformanceItem,
   getPerformanceSalesAgent,
   getPerformanceDebtor,
@@ -29,7 +29,7 @@ export const rpcRegistry: Record<string, RpcHandler> = {
   get_item_best_sellers_v2: (p) => getItemBestSellers(p),
   get_monthly_trend_v2: (p) => getMonthlyTrend(p),
   get_monthly_breakdown_v2: (p) => getMonthlyBreakdown(p),
-  get_performance_branch_v2: (p) => getPerformanceBranch(p),
+  get_performance_location_v2: (p) => getPerformanceLocation(p),
   get_performance_item_v2: (p) => getPerformanceItem(p),
   get_performance_sales_agent_v2: (p) => getPerformanceSalesAgent(p),
   get_performance_debtor_v2: (p) => getPerformanceDebtor(p),

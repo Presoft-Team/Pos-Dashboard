@@ -15,7 +15,7 @@ import PerformanceTable from '@/components/performance-table'
 import ExportModal, { ExportChartSpec, ExportTableSpec } from '@/components/export-modal'
 import { Download } from 'lucide-react'
 
-const ENTITY_FIELDS = ['branch', 'item', 'sales_agent', 'debtor'] as const
+const ENTITY_FIELDS = ['location', 'item', 'sales_agent', 'debtor'] as const
 type EntityField = (typeof ENTITY_FIELDS)[number]
 
 const GROUP_LABEL: Record<GroupByMode, string> = { item: 'Item', group: 'Group', type: 'Type' }
@@ -34,7 +34,7 @@ export default function PerformancePage() {
   const supabase = createClient()
 
   const { filters, setFilters, groupBy, setGroupBy, options } = useSharedFilters()
-  const [branchRows, setBranchRows] = useState<PerformanceRow[]>([])
+  const [locationRows, setLocationRows] = useState<PerformanceRow[]>([])
   const [itemRows, setItemRows] = useState<PerformanceRow[]>([])
   const [agentRows, setAgentRows] = useState<PerformanceRow[]>([])
   const [debtorRows, setDebtorRows] = useState<PerformanceRow[]>([])
@@ -61,18 +61,18 @@ export default function PerformancePage() {
     // let chartData() above re-slice down to 5 for the chart only.
     const p = { ...toParams(filters), p_limit: null }
 
-    const [branchRes, itemRes, agentRes, debtorRes] = await Promise.all([
-      supabase.rpc('get_performance_branch_v2', p),
+    const [locationRes, itemRes, agentRes, debtorRes] = await Promise.all([
+      supabase.rpc('get_performance_location_v2', p),
       supabase.rpc('get_performance_item_v2', { ...p, p_group_by: groupBy }),
       supabase.rpc('get_performance_sales_agent_v2', p),
       supabase.rpc('get_performance_debtor_v2', p),
     ])
 
-    for (const [label, res] of [['branch', branchRes], ['item', itemRes], ['sales_agent', agentRes], ['debtor', debtorRes]] as const) {
+    for (const [label, res] of [['location', locationRes], ['item', itemRes], ['sales_agent', agentRes], ['debtor', debtorRes]] as const) {
       if (res.error) console.error(`get_performance_${label}_v2 error:`, res.error.message)
     }
 
-    setBranchRows((branchRes.data as PerformanceRow[]) ?? [])
+    setLocationRows((locationRes.data as PerformanceRow[]) ?? [])
     setItemRows((itemRes.data as PerformanceRow[]) ?? [])
     setAgentRows((agentRes.data as PerformanceRow[]) ?? [])
     setDebtorRows((debtorRes.data as PerformanceRow[]) ?? [])
@@ -82,7 +82,7 @@ export default function PerformancePage() {
   const itemLabel = GROUP_LABEL[groupBy]
   const sections: { field: EntityField; title: string; rows: PerformanceRow[] }[] = [
     { field: 'item', title: `${itemLabel} Breakdown`, rows: itemRows },
-    { field: 'branch', title: 'Branch Breakdown', rows: branchRows },
+    { field: 'location', title: 'Location Breakdown', rows: locationRows },
     { field: 'sales_agent', title: 'Sales Agent Breakdown', rows: agentRows },
     { field: 'debtor', title: 'Debtor Breakdown', rows: debtorRows },
   ]
@@ -106,7 +106,7 @@ export default function PerformancePage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Performance</h1>
-          <p className="text-sm text-gray-500">Branch, Item, Sales Agent, and Debtor performance</p>
+          <p className="text-sm text-gray-500">Location, Item, Sales Agent, and Debtor performance</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <FilterBar
