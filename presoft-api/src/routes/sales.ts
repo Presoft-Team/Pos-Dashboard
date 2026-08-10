@@ -23,7 +23,7 @@ const GROUP_BY_CASE = (col: string) => `
  *     parameters:
  *       - $ref: '#/components/parameters/date_from'
  *       - $ref: '#/components/parameters/date_to'
- *       - $ref: '#/components/parameters/branch'
+ *       - $ref: '#/components/parameters/location'
  *       - $ref: '#/components/parameters/item'
  *       - $ref: '#/components/parameters/sales_agent'
  *       - $ref: '#/components/parameters/debtor'
@@ -72,7 +72,7 @@ salesRouter.get('/sales/revenue', async (req, res, next) => {
  *     parameters:
  *       - $ref: '#/components/parameters/date_from'
  *       - $ref: '#/components/parameters/date_to'
- *       - $ref: '#/components/parameters/branch'
+ *       - $ref: '#/components/parameters/location'
  *       - $ref: '#/components/parameters/item'
  *       - $ref: '#/components/parameters/sales_agent'
  *       - $ref: '#/components/parameters/debtor'

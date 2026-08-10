@@ -48,7 +48,7 @@ const RPC_TO_PATH: Record<string, string> = {
   get_item_best_sellers_v2: '/api/v1/sales/best-sellers',
   get_monthly_trend_v2: '/api/v1/sales/monthly-trend',
   get_monthly_breakdown_v2: '/api/v1/sales/monthly-breakdown',
-  get_performance_branch_v2: '/api/v1/performance/branches',
+  get_performance_location_v2: '/api/v1/performance/locations',
   get_performance_item_v2: '/api/v1/performance/items',
   get_performance_sales_agent_v2: '/api/v1/performance/sales-agents',
   get_performance_debtor_v2: '/api/v1/performance/debtors',

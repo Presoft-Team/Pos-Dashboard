@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Search } from 'lucide-react'
-import { CreditPaidInvoiceRow } from '@/types'
+import { CreditPaidInvoiceRow, RevenueJoinIntegrityRow } from '@/types'
 import { formatMoney } from '@/lib/currency'
 
 // Ad-hoc verification page — not linked from nav. No search: browse the
@@ -14,6 +14,10 @@ export default function TestPage() {
   const [rows, setRows] = useState<CreditPaidInvoiceRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const [joinRows, setJoinRows] = useState<RevenueJoinIntegrityRow[]>([])
+  const [joinLoading, setJoinLoading] = useState(true)
+  const [joinError, setJoinError] = useState<string | null>(null)
 
   useEffect(() => {
     setLoading(true)
@@ -32,8 +36,56 @@ export default function TestPage() {
       .finally(() => setLoading(false))
   }, [search])
 
+  useEffect(() => {
+    setJoinLoading(true)
+    setJoinError(null)
+    fetch('/api/test/join-integrity')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.error) {
+          setJoinError(data.error)
+        } else {
+          setJoinRows(data)
+        }
+      })
+      .catch((err) => setJoinError(err instanceof Error ? err.message : 'Fetch failed'))
+      .finally(() => setJoinLoading(false))
+  }, [])
+
   return (
-    <div className="p-4 lg:p-6">
+    <div className="p-4 lg:p-6 space-y-4">
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 lg:p-5">
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">
+          Test Query — Revenue Join Integrity
+        </p>
+
+        {joinLoading && <p className="text-sm text-gray-400">Loading…</p>}
+        {joinError && <p className="text-sm text-danger">{joinError}</p>}
+
+        {!joinLoading && !joinError && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-left">
+                  <th className="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Check</th>
+                  <th className="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Orphan Count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {joinRows.map((r) => (
+                  <tr key={r.check_name} className="border-t border-gray-100">
+                    <td className="px-3 py-2">{r.check_name}</td>
+                    <td className={`px-3 py-2 text-right font-medium ${r.orphan_count > 0 ? 'text-danger' : 'text-gray-400'}`}>
+                      {r.orphan_count}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 lg:p-5">
         <div className="flex items-center justify-between gap-3 mb-3">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">

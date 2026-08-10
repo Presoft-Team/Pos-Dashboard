@@ -37,7 +37,7 @@ export function formatFilterSummary(filters: Filters, options?: FilterOptions): 
       ? `Date: ${filters.date_from || 'earliest'} to ${filters.date_to || 'latest'}`
       : 'Date: All'
   )
-  parts.push(`Branch: ${filters.branch ? nameOf(options?.branches, filters.branch) : 'All'}`)
+  parts.push(`Location: ${filters.location ? nameOf(options?.locations, filters.location) : 'All'}`)
   parts.push(`Item: ${filters.item ? nameOf(options?.items, filters.item) : 'All'}`)
   parts.push(`Sales Agent: ${filters.sales_agent ? nameOf(options?.sales_agents, filters.sales_agent) : 'All'}`)
   parts.push(`Debtor: ${filters.debtor ? nameOf(options?.debtors, filters.debtor) : 'All'}`)

@@ -13,16 +13,21 @@ interface EntityOption {
  * /api/v1/filter-options:
  *   get:
  *     summary: Dropdown lists and date range for every filterable dimension
+ *     description: >
+ *       `locations` reads dbo.Location, not dbo.Branch — the Branch filter
+ *       was replaced with a Location filter by explicit request. Sales/
+ *       purchase docs resolve to a Location via their own SalesLocation/
+ *       PurchaseLocation column (see db/sql-fragments.ts).
  *     tags: [Filters]
  *     responses:
  *       200:
- *         description: Branches, items, sales agents, debtors, item groups/types, currencies, and the overall date range.
+ *         description: Locations, items, sales agents, debtors, item groups/types, currencies, and the overall date range.
  */
 filterOptionsRouter.get('/filter-options', async (_req, res, next) => {
   try {
     const request = await getRequest()
     const result = await request.query(`
-      SELECT BranchCode AS id, BranchCode AS name FROM Branch ORDER BY BranchCode;
+      SELECT Location AS id, COALESCE(Description, Location) AS name FROM Location ORDER BY Location;
       SELECT ItemCode AS id, ItemCode AS name FROM Item ORDER BY ItemCode;
       SELECT SalesAgent AS id, SalesAgent AS name FROM SalesAgent ORDER BY SalesAgent;
       SELECT AccNo AS id, CompanyName AS name FROM Debtor ORDER BY CompanyName;
@@ -38,7 +43,7 @@ filterOptionsRouter.get('/filter-options', async (_req, res, next) => {
       ) x;
     `)
 
-    const [branches, items, sales_agents, debtors, groups, types, currencies, dates] =
+    const [locations, items, sales_agents, debtors, groups, types, currencies, dates] =
       result.recordsets as unknown as [
         EntityOption[], EntityOption[], EntityOption[], EntityOption[],
         { value: string }[], { value: string }[], { value: string }[],
@@ -46,7 +51,7 @@ filterOptionsRouter.get('/filter-options', async (_req, res, next) => {
       ]
 
     res.json({
-      branches,
+      locations,
       items,
       sales_agents,
       debtors,

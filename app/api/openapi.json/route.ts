@@ -12,7 +12,7 @@ const money = { type: 'number' }
 const commonParamsProperties = {
   p_date_from: { ...nullableString, format: 'date' },
   p_date_to: { ...nullableString, format: 'date' },
-  p_branch: nullableString,
+  p_location: nullableString,
   p_item: nullableString,
   p_sales_agent: nullableString,
   p_debtor: nullableString,
@@ -101,7 +101,7 @@ const openApiSpec = {
         items: {
           type: 'object',
           properties: {
-            branches: entityOptionArray,
+            locations: entityOptionArray,
             items: entityOptionArray,
             sales_agents: entityOptionArray,
             debtors: entityOptionArray,
@@ -227,8 +227,8 @@ const openApiSpec = {
       }
     ),
 
-    '/get_performance_branch_v2': rpcPath(
-      'Performance page — by Branch',
+    '/get_performance_location_v2': rpcPath(
+      'Performance page — by Location',
       'p_limit null = unlimited (Performance page always fetches everything and re-slices client-side).',
       { type: 'object', properties: { ...commonParamsProperties, p_limit: nullableInt } },
       performanceRowSchema
@@ -261,14 +261,16 @@ const openApiSpec = {
     '/get_item_catalog_v2': rpcPath(
       'Item page catalog',
       'p_search null = browse mode (top p_limit items ranked by p_sort); p_search set = lookup mode (every match, unlimited, still ordered by p_sort). ' +
-        'Uses its own param set, not the common filter params — no date/sales_agent/debtor/currency.',
+        'Uses its own param set, not the common filter params — no date/sales_agent/debtor/currency. ' +
+        'p_location is a dbo.Location code — same list as get_filter_options_v2\'s `locations` (used by every other page too, not just Item). ' +
+        'Cost/price are single-valued per item — both come from ItemUOM Cost/Price on the item\'s BaseUOM row (not a stock-ledger snapshot, a recent sale price, or a per-location ItemLocationPrice override anymore). Every row for the same item repeats the same cost/price; qty_on_hand is summed across UOM/batch into one total per location.',
       {
         type: 'object',
         properties: {
           p_search: nullableString,
           p_item_group: nullableString,
           p_item_type: nullableString,
-          p_branch: nullableString,
+          p_location: nullableString,
           p_item: nullableString,
           p_sort: { ...nullableString, enum: ['item_code', 'cost_desc', 'cost_asc', 'price_desc', 'price_asc'], default: 'item_code' },
           p_limit: { ...nullableInt, default: 6 },
@@ -284,7 +286,7 @@ const openApiSpec = {
             description: { type: 'string' },
             item_group: { ...nullableString },
             item_type: { ...nullableString },
-            branch_name: { ...nullableString },
+            location_name: { ...nullableString },
             qty_on_hand: { type: 'number' },
             cost: money,
             unit_price: money,

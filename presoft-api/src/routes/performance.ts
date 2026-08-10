@@ -13,14 +13,14 @@ function getLimit(req: { query: Record<string, unknown> }): number {
 
 /**
  * @openapi
- * /api/v1/performance/branches:
+ * /api/v1/performance/locations:
  *   get:
- *     summary: Top-N branch performance (Cash/Credit qty + revenue)
+ *     summary: Top-N location performance (Cash/Credit qty + revenue)
  *     tags: [Performance]
  *     parameters:
  *       - $ref: '#/components/parameters/date_from'
  *       - $ref: '#/components/parameters/date_to'
- *       - $ref: '#/components/parameters/branch'
+ *       - $ref: '#/components/parameters/location'
  *       - $ref: '#/components/parameters/item'
  *       - $ref: '#/components/parameters/sales_agent'
  *       - $ref: '#/components/parameters/debtor'
@@ -30,9 +30,9 @@ function getLimit(req: { query: Record<string, unknown> }): number {
  *       - $ref: '#/components/parameters/limit'
  *     responses:
  *       200:
- *         description: Top N branches by total revenue, one row per (branch, currency).
+ *         description: Top N locations by total revenue, one row per (location, currency).
  */
-performanceRouter.get('/performance/branches', async (req, res, next) => {
+performanceRouter.get('/performance/locations', async (req, res, next) => {
   try {
     const filters = parseCommonFilters(req)
     const request = await getRequest()
@@ -41,16 +41,16 @@ performanceRouter.get('/performance/branches', async (req, res, next) => {
     const result = await request.query(`
       WITH ${SALES_CTE}
       SELECT TOP (@limit)
-        b.BranchCode AS id, b.BranchCode AS name, s.currency,
+        loc.Location AS id, COALESCE(loc.Description, loc.Location) AS name, s.currency,
         COALESCE(SUM(CASE WHEN s.is_credit = 1 THEN s.quantity ELSE 0 END), 0) AS credit_qty,
         COALESCE(SUM(CASE WHEN s.is_credit = 0 THEN s.quantity ELSE 0 END), 0) AS cash_qty,
         COALESCE(SUM(CASE WHEN s.is_credit = 1 THEN s.revenue ELSE 0 END), 0) AS credit_revenue,
         COALESCE(SUM(CASE WHEN s.is_credit = 0 THEN s.revenue ELSE 0 END), 0) AS cash_revenue
       FROM sales s
-      JOIN Branch b ON b.BranchCode = s.branch_id
+      JOIN Location loc ON loc.Location = s.location_id
       JOIN Item i ON i.ItemCode = s.item_id
       WHERE ${salesCommonWhere('s')}
-      GROUP BY b.BranchCode, s.currency
+      GROUP BY loc.Location, loc.Description, s.currency
       ORDER BY (COALESCE(SUM(s.revenue), 0)) DESC;
     `)
     res.json(result.recordset)
@@ -68,7 +68,7 @@ performanceRouter.get('/performance/branches', async (req, res, next) => {
  *     parameters:
  *       - $ref: '#/components/parameters/date_from'
  *       - $ref: '#/components/parameters/date_to'
- *       - $ref: '#/components/parameters/branch'
+ *       - $ref: '#/components/parameters/location'
  *       - $ref: '#/components/parameters/item'
  *       - $ref: '#/components/parameters/sales_agent'
  *       - $ref: '#/components/parameters/debtor'
@@ -131,7 +131,7 @@ performanceRouter.get('/performance/items', async (req, res, next) => {
  *     parameters:
  *       - $ref: '#/components/parameters/date_from'
  *       - $ref: '#/components/parameters/date_to'
- *       - $ref: '#/components/parameters/branch'
+ *       - $ref: '#/components/parameters/location'
  *       - $ref: '#/components/parameters/item'
  *       - $ref: '#/components/parameters/sales_agent'
  *       - $ref: '#/components/parameters/debtor'
@@ -179,7 +179,7 @@ performanceRouter.get('/performance/sales-agents', async (req, res, next) => {
  *     parameters:
  *       - $ref: '#/components/parameters/date_from'
  *       - $ref: '#/components/parameters/date_to'
- *       - $ref: '#/components/parameters/branch'
+ *       - $ref: '#/components/parameters/location'
  *       - $ref: '#/components/parameters/item'
  *       - $ref: '#/components/parameters/sales_agent'
  *       - $ref: '#/components/parameters/debtor'
