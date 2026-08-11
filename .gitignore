@@ -4,8 +4,6 @@ node_modules/
 # Next.js
 .next/
 out/
-
-# presoft-api build output
 dist/
 
 # environment variables
