@@ -16,6 +16,9 @@ dist/
 *.log
 *.tsbuildinfo
 
+# Visual Studio
+.vs/
+
 # internal planning docs & local SQL scripts — not for the public repo
 *.sql
 *.md
