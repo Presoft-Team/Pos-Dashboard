@@ -3,13 +3,11 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard,
   CalendarDays,
   BarChart3,
   Tag,
-  Users,
   LogOut,
   X,
 } from 'lucide-react'
@@ -29,28 +27,25 @@ interface Props {
 export default function Sidebar({ mobileOpen, onClose }: Props) {
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = createClient()
   const [isAdmin, setIsAdmin] = useState(false)
   const [userName, setUserName] = useState('')
   const [userEmail, setUserEmail] = useState('')
-  const [organisation, setOrganisation] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setIsAdmin(user?.app_metadata?.role === 'admin')
-      setUserName((user?.user_metadata?.name as string) || '')
-      setUserEmail(user?.email ?? '')
-      setOrganisation((user?.app_metadata?.organisation as string) || null)
-    })
+    fetch('/api/auth/me')
+      .then((res) => (res.ok ? res.json() : { user: null }))
+      .then(({ user }) => {
+        setIsAdmin(user?.role === 'admin')
+        setUserName(user?.name ?? '')
+        setUserEmail(user?.email ?? '')
+      })
   }, [])
 
   async function handleLogout() {
-    await supabase.auth.signOut()
+    await fetch('/api/auth/logout', { method: 'POST' })
     router.push('/login')
     router.refresh()
   }
-
-  const nav = isAdmin ? [...NAV, { href: '/members', label: 'Members', icon: Users }] : NAV
 
   return (
     <>
@@ -85,7 +80,6 @@ export default function Sidebar({ mobileOpen, onClose }: Props) {
             <p className="text-sand text-xs truncate">{userEmail}</p>
             <p className="text-sand text-xs truncate">
               {isAdmin ? 'Admin' : 'Member'}
-              {organisation && <> · {organisation}</>}
             </p>
           </div>
           <button
@@ -99,7 +93,7 @@ export default function Sidebar({ mobileOpen, onClose }: Props) {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          {nav.map(({ href, label, icon: Icon }) => {
+          {NAV.map(({ href, label, icon: Icon }) => {
             const active = href === '/' ? pathname === '/' : pathname.startsWith(href)
             return (
               <Link
