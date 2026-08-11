@@ -5,8 +5,8 @@
 // presoft-api (:4000).
 import { NextRequest, NextResponse } from 'next/server'
 import { SESSION_COOKIE } from '@/lib/auth/jwt'
+import { PRESOFT_API_URL, presoftApiHeaders } from '@/lib/presoft-api'
 
-const PRESOFT_API_URL = process.env.NEXT_PUBLIC_PRESOFT_API_URL ?? 'http://localhost:4000'
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7 // 7 days — matches presoft-api's default JWT_EXPIRES_IN
 
 export async function POST(request: NextRequest) {
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   try {
     apiRes = await fetch(`${PRESOFT_API_URL}/api/v1/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: presoftApiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ email, password }),
     })
   } catch {
