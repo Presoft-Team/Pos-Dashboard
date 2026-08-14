@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   CalendarDays,
   BarChart3,
+  Truck,
   Tag,
   LogOut,
   X,
@@ -16,6 +17,7 @@ const NAV = [
   { href: '/',            label: 'Dashboard',   icon: LayoutDashboard },
   { href: '/monthly',     label: 'Monthly',     icon: CalendarDays },
   { href: '/performance', label: 'Performance', icon: BarChart3 },
+  { href: '/purchase',    label: 'Purchase',    icon: Truck },
   { href: '/item',        label: 'Item',        icon: Tag },
 ]
 

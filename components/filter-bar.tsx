@@ -28,6 +28,13 @@ interface Props {
   // Overrides the default from/to date pickers (e.g. Sales Dashboard's
   // preset selector) when provided. Other pages keep the plain pickers.
   datePicker?: ReactNode
+  // Purchase has no Sales Agent concept and shows Creditor instead of
+  // Debtor — these default to the original Sales/Monthly/Performance/Item
+  // behavior (Sales Agent + Debtor shown, Creditor hidden) so no existing
+  // page needs to change.
+  showSalesAgent?: boolean
+  showDebtor?: boolean
+  showCreditor?: boolean
 }
 
 // Global FilterBar (PLAN.md Section 3) — shared by Sales Dashboard, Monthly
@@ -50,7 +57,10 @@ interface Props {
 // "fill" the way it does on a plain <div> (only mobile's plain `w-full` —
 // an explicit 100%, not
 // auto — works without this).
-export default function FilterBar({ filters, options, onChange, groupBy = 'item', onGroupByChange, trailing = [], datePicker }: Props) {
+export default function FilterBar({
+  filters, options, onChange, groupBy = 'item', onGroupByChange, trailing = [], datePicker,
+  showSalesAgent = true, showDebtor = true, showCreditor = false,
+}: Props) {
   function set(key: keyof Filters, value: string) {
     onChange({ ...filters, [key]: value })
   }
@@ -108,13 +118,17 @@ export default function FilterBar({ filters, options, onChange, groupBy = 'item'
   // provided — it also drives which grouping the chart/table use, not just
   // this field, so it stays even if the active list happens to be empty.
   const toggle = onGroupByChange ? <GroupByToggle value={groupBy} onChange={onGroupByChange} /> : null
-  const hasSalesAgent = options.sales_agents.length > 0
+  const hasSalesAgent = showSalesAgent && options.sales_agents.length > 0
   const salesAgent = (
     <Combobox value={filters.sales_agent} onChange={(v) => set('sales_agent', v)} options={options.sales_agents} placeholder="All Sales Agents" ariaLabel="Sales Agent" fullWidth />
   )
-  const hasDebtor = options.debtors.length > 0
+  const hasDebtor = showDebtor && options.debtors.length > 0
   const debtor = (
     <Combobox value={filters.debtor} onChange={(v) => set('debtor', v)} options={options.debtors} placeholder="All Debtors" ariaLabel="Debtor" fullWidth />
+  )
+  const hasCreditor = showCreditor && options.creditors.length > 0
+  const creditor = (
+    <Combobox value={filters.creditor} onChange={(v) => set('creditor', v)} options={options.creditors} placeholder="All Creditors" ariaLabel="Creditor" fullWidth />
   )
 
   // Mobile — entity fields with nothing to filter by hide themselves;
@@ -128,6 +142,7 @@ export default function FilterBar({ filters, options, onChange, groupBy = 'item'
     ...(hasItemDynamic ? [{ key: 'item', node: itemDynamic }] : []),
     ...(hasSalesAgent ? [{ key: 'salesAgent', node: salesAgent }] : []),
     ...(hasDebtor ? [{ key: 'debtor', node: debtor }] : []),
+    ...(hasCreditor ? [{ key: 'creditor', node: creditor }] : []),
   ]
 
   return (

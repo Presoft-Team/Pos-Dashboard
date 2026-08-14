@@ -20,6 +20,9 @@ const RPC_TO_PATH: Record<string, string> = {
   get_performance_item_v2: '/api/v1/performance/items',
   get_performance_sales_agent_v2: '/api/v1/performance/sales-agents',
   get_performance_debtor_v2: '/api/v1/performance/debtors',
+  get_purchase_item_v2: '/api/v1/purchase/items',
+  get_purchase_location_v2: '/api/v1/purchase/locations',
+  get_purchase_creditor_v2: '/api/v1/purchase/creditors',
   get_item_catalog_v2: '/api/v1/items',
 }
 
