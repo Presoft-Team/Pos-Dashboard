@@ -28,6 +28,9 @@ export default function LoginPage() {
       setError(body.error ?? 'Login failed')
       setLoading(false)
     } else {
+      // If the business hasn't configured its presoft-api connection yet,
+      // the dashboard itself prompts for it via a blocking modal (see
+      // components/api-config-modal.tsx) rather than a separate route.
       router.push('/')
       router.refresh()
     }

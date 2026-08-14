@@ -16,6 +16,11 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
+  // First-time tenant onboarding (missing business api_url/api_key) is
+  // handled inside the dashboard as a blocking modal (see
+  // components/api-config-modal.tsx), not a route redirect — no branch
+  // needed here.
+
   return NextResponse.next()
 }
 
