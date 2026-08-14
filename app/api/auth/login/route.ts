@@ -38,7 +38,6 @@ export async function POST(request: NextRequest) {
   // Debug only — remove once done debugging. No password hash here: this
   // route never receives one, presoft-api only returns id/userId/email/
   // name/role in its login response.
-  console.log('[login]', data.user)
 
   const response = NextResponse.json({ user: data.user })
   response.cookies.set(SESSION_COOKIE, data.token, {
