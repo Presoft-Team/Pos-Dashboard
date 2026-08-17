@@ -81,8 +81,9 @@ export default function MonthlyPage() {
     setLoading(false)
   }
 
-  // 4 lines (Total, Cash+Paid, Credit not-due, Credit overdue), chronological.
-  const chartData = pivotMonthlyTrend(trend, MONTH_NAMES)
+  // 3 lines (Total, Cash, Credit), chronological — zero-sales months in the
+  // filtered range still get a row so they don't vanish from the x-axis.
+  const chartData = pivotMonthlyTrend(trend, MONTH_NAMES, filters.date_from, filters.date_to)
 
   const exportCharts: ExportChartSpec[] = [
     { id: 'trend-chart', label: 'Monthly Revenue Trend', render: () => <MonthlyTrendChart data={chartData} /> },

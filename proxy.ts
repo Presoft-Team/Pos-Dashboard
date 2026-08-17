@@ -1,32 +1,12 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth/jwt'
 
-export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request })
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          response = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
-
-  const { data: { user } } = await supabase.auth.getUser()
+export function proxy(request: NextRequest) {
+  const token = request.cookies.get(SESSION_COOKIE)?.value
+  const user = token ? verifySessionToken(token) : null
   const { pathname } = request.nextUrl
 
-  const isAuthPath = pathname.startsWith('/login') || pathname.startsWith('/auth') || pathname.startsWith('/forgot-password') || pathname.startsWith('/reset-password')
+  const isAuthPath = pathname.startsWith('/login') || pathname.startsWith('/forgot-password') || pathname.startsWith('/reset-password')
 
   if (!user && !isAuthPath) {
     return NextResponse.redirect(new URL('/login', request.url))
@@ -36,9 +16,18 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
-  return response
+  // First-time tenant onboarding (missing business api_url/api_key) is
+  // handled inside the dashboard as a blocking modal (see
+  // components/api-config-modal.tsx), not a route redirect — no branch
+  // needed here.
+
+  return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  // Excludes /api entirely — a 307-to-HTML redirect never meaningfully
+  // protected JSON endpoints anyway (it just breaks non-browser callers),
+  // and /api/auth/login specifically must be reachable while logged out or
+  // no session could ever be created in the first place.
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }

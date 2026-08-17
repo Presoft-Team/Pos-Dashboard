@@ -139,23 +139,53 @@ interface CashCreditRevenueRow {
 // Cash/Credit pivot, chronological (by year/month) rather than ranked by
 // magnitude — for the Monthly Sales trend chart, which needs its months in
 // order, not sorted by size.
+//
+// The API only returns rows for months that actually had sales — a month
+// with $0 revenue is a missing row, not a zero row. Left as-is, that reads
+// on the chart as "no data available" rather than "nothing sold," and the
+// x-axis silently skips months. When dateFrom/dateTo are given, this fills
+// every month in that range with a zeroed entry before overlaying the real
+// rows, so gaps render as a flat 0 instead of vanishing.
 export function pivotMonthlyTrend<T extends CashCreditRevenueRow & { year: number; month: number }>(
   rows: T[],
-  monthNames: string[]
+  monthNames: string[],
+  dateFrom?: string | null,
+  dateTo?: string | null
 ): CashCreditPivotRow[] {
-  const order: string[] = []
   const byMonth = new Map<string, CashCreditPivotRow>()
   for (const row of rows) {
     const key = `${row.year}-${row.month}`
-    if (!byMonth.has(key)) {
-      byMonth.set(key, { name: `${monthNames[row.month]} ${row.year}`, cash: 0, credit: 0, total: 0, breakdown: [] })
-      order.push(key)
-    }
-    const entry = byMonth.get(key)!
+    const entry = byMonth.get(key) ?? { name: `${monthNames[row.month]} ${row.year}`, cash: 0, credit: 0, total: 0, breakdown: [] }
     entry.cash += row.cash_revenue
     entry.credit += row.credit_revenue
     entry.total += row.cash_revenue + row.credit_revenue
     entry.breakdown.push({ currency: row.currency, cash: row.cash_revenue, credit: row.credit_revenue })
+    byMonth.set(key, entry)
   }
-  return order.map((k) => byMonth.get(k)!)
+
+  let order: string[]
+  if (dateFrom && dateTo) {
+    order = []
+    const [fy, fm] = dateFrom.split('-').map(Number)
+    const [ty, tm] = dateTo.split('-').map(Number)
+    let y = fy
+    let m = fm
+    while (y < ty || (y === ty && m <= tm)) {
+      order.push(`${y}-${m}`)
+      m += 1
+      if (m > 12) { m = 1; y += 1 }
+    }
+  } else {
+    // No range given (shouldn't happen in practice — every page sets a
+    // default date range on load) — fall back to whichever months the data
+    // itself contains, in first-seen order.
+    order = [...byMonth.keys()]
+  }
+
+  return order.map((key) => {
+    const existing = byMonth.get(key)
+    if (existing) return existing
+    const [y, m] = key.split('-').map(Number)
+    return { name: `${monthNames[m]} ${y}`, cash: 0, credit: 0, total: 0, breakdown: [] }
+  })
 }

@@ -4,8 +4,6 @@ node_modules/
 # Next.js
 .next/
 out/
-
-# presoft-api build output
 dist/
 
 # environment variables
@@ -17,6 +15,9 @@ dist/
 .DS_Store
 *.log
 *.tsbuildinfo
+
+# Visual Studio
+.vs/
 
 # internal planning docs & local SQL scripts — not for the public repo
 *.sql

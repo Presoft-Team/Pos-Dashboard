@@ -1,14 +1,12 @@
 // Drop-in replacement for `createClient().rpc(name, params)` from
 // @supabase/supabase-js (lib/supabase/client.ts) — but instead of calling
-// this app's own internal /api/rpc/[name] dispatcher, this calls the
-// standalone presoft-api service's REST endpoints directly (by request —
-// see PLAN.md §8). Page components that only ever called `supabase.rpc(...)`
-// need no other changes. Client-safe (no 'server-only', no mssql import) —
-// this fetch happens straight from the browser to presoft-api, which is why
-// presoft-api has CORS enabled.
+// presoft-api directly, this calls this app's own /api/presoft/[name]
+// server-side proxy (app/api/presoft/[name]/route.ts), which forwards to
+// presoft-api with the API key attached. That indirection exists
+// specifically so the key never reaches this browser-side bundle. Page
+// components that only ever called `supabase.rpc(...)` need no other
+// changes.
 'use client'
-
-const API_BASE = process.env.NEXT_PUBLIC_PRESOFT_API_URL ?? 'http://localhost:4000'
 
 // presoft-api has no "unlimited" convention for `limit` (missing = its own
 // sensible default of 5, for public API callers who forget to set one) —
@@ -39,22 +37,6 @@ function toQueryString(params?: Record<string, unknown>): string {
   return qs ? `?${qs}` : ''
 }
 
-// Maps the old Postgres RPC names every page still calls (unchanged) to
-// presoft-api's REST paths.
-const RPC_TO_PATH: Record<string, string> = {
-  get_filter_options_v2: '/api/v1/filter-options',
-  get_kpi_summary_v2: '/api/v1/kpi-summary',
-  get_item_revenue_v2: '/api/v1/sales/revenue',
-  get_item_best_sellers_v2: '/api/v1/sales/best-sellers',
-  get_monthly_trend_v2: '/api/v1/sales/monthly-trend',
-  get_monthly_breakdown_v2: '/api/v1/sales/monthly-breakdown',
-  get_performance_location_v2: '/api/v1/performance/locations',
-  get_performance_item_v2: '/api/v1/performance/items',
-  get_performance_sales_agent_v2: '/api/v1/performance/sales-agents',
-  get_performance_debtor_v2: '/api/v1/performance/debtors',
-  get_item_catalog_v2: '/api/v1/items',
-}
-
 interface RpcResult<T = unknown> {
   data: T | null
   error: { message: string } | null
@@ -67,24 +49,18 @@ export function createClient() {
     // this being permissive unless a call site passes an explicit <T>.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async rpc<T = any>(name: string, params?: Record<string, unknown>): Promise<RpcResult<T>> {
-      const path = RPC_TO_PATH[name]
-      if (!path) {
-        return { data: null, error: { message: `Unknown RPC: ${name} (no presoft-api route mapped)` } }
-      }
       try {
-        const res = await fetch(`${API_BASE}${path}${toQueryString(params)}`)
+        // Name-to-path mapping, the API key, and the filter-options
+        // array-wrapping quirk all live server-side now, in
+        // app/api/presoft/[name]/route.ts.
+        const res = await fetch(`/api/presoft/${name}${toQueryString(params)}`)
+        const body = await res.json().catch(() => ({}) as { error?: string })
         if (!res.ok) {
-          const body = await res.json().catch(() => ({}) as { error?: string })
-          return { data: null, error: { message: body.error ?? `Request failed (${res.status})` } }
+          return { data: null, error: { message: (body as { error?: string }).error ?? `Request failed (${res.status})` } }
         }
-        let data = await res.json()
-        // get_filter_options_v2's Postgres original returned RETURNS TABLE
-        // (a single row), so every page reads it via `data?.[0]` —
-        // presoft-api returns a plain object for this one; wrap it to match.
-        if (name === 'get_filter_options_v2') data = [data]
-        return { data: data as T, error: null }
+        return { data: body as T, error: null }
       } catch (err) {
-        return { data: null, error: { message: err instanceof Error ? err.message : 'Unknown error — is presoft-api running?' } }
+        return { data: null, error: { message: err instanceof Error ? err.message : 'Unknown error — is the dashboard server running?' } }
       }
     },
   }

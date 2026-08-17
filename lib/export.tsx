@@ -41,6 +41,7 @@ export function formatFilterSummary(filters: Filters, options?: FilterOptions): 
   parts.push(`Item: ${filters.item ? nameOf(options?.items, filters.item) : 'All'}`)
   parts.push(`Sales Agent: ${filters.sales_agent ? nameOf(options?.sales_agents, filters.sales_agent) : 'All'}`)
   parts.push(`Debtor: ${filters.debtor ? nameOf(options?.debtors, filters.debtor) : 'All'}`)
+  parts.push(`Creditor: ${filters.creditor ? nameOf(options?.creditors, filters.creditor) : 'All'}`)
   parts.push(`Item Group: ${filters.item_group || 'All'}`)
   parts.push(`Item Type: ${filters.item_type || 'All'}`)
   return parts.join('   |   ')
@@ -62,6 +63,19 @@ export function entityRevenueColumns(nameKey: string, nameLabel: string): Export
     { key: 'cash_qty', label: 'Cash Qty', align: 'right', formatForPdf: (r) => fmtInt(r.cash_qty) },
     { key: 'credit_revenue', label: 'Credit Revenue', align: 'right', formatForPdf: (r) => formatAmount(Number(r.credit_revenue ?? 0)) },
     { key: 'cash_revenue', label: 'Cash Revenue', align: 'right', formatForPdf: (r) => formatAmount(Number(r.cash_revenue ?? 0)) },
+  ]
+}
+
+// Purchase-side twin of entityRevenueColumns — credit_purchase/cash_purchase,
+// not credit_revenue/cash_revenue (this is spend, not revenue).
+export function entityPurchaseColumns(nameKey: string, nameLabel: string): ExportColumn[] {
+  return [
+    { key: nameKey, label: nameLabel },
+    { key: 'currency', label: 'Currency' },
+    { key: 'credit_qty', label: 'Credit Qty', align: 'right', formatForPdf: (r) => fmtInt(r.credit_qty) },
+    { key: 'cash_qty', label: 'Cash Qty', align: 'right', formatForPdf: (r) => fmtInt(r.cash_qty) },
+    { key: 'credit_purchase', label: 'Credit Purchase', align: 'right', formatForPdf: (r) => formatAmount(Number(r.credit_purchase ?? 0)) },
+    { key: 'cash_purchase', label: 'Cash Purchase', align: 'right', formatForPdf: (r) => formatAmount(Number(r.cash_purchase ?? 0)) },
   ]
 }
 
