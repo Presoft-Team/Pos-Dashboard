@@ -177,21 +177,6 @@ export interface ItemCatalogRow {
   max_price: number | null
 }
 
-// --- /test page (ad-hoc verification, not part of rpc_v2) ---------------
-
-export interface CreditPaidInvoiceRow {
-  doc_no: string
-  order_date: string
-  debtor_id: string
-  branch_id: string
-  sales_agent_id: string
-  currency: string
-  due_date: string | null
-  outstanding: number
-  revenue: number
-}
-
-export interface RevenueJoinIntegrityRow {
-  check_name: string
-  orphan_count: number
-}
+// The /test page's old row types lived here. They went away with the
+// direct-to-SQL-Server verification queries (lib/mssql.ts): /test now only
+// checks the presoft-api connection, and shapes its responses inline.
