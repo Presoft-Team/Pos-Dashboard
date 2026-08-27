@@ -5,13 +5,9 @@ export interface EntityOption {
   name: string
 }
 
+// The API also returns a `locations` list, but nothing consumes it — the
+// Location filter and the Location breakdowns were removed from every page.
 export interface FilterOptions {
-  // dbo.Location — unified across every page: Sales/Monthly/Performance
-  // filter sales/purchase docs by their own SalesLocation/PurchaseLocation,
-  // and Item filters stock by the same Location code (previously a
-  // page-local fetch via get_item_locations_v2, before "Branch" was
-  // replaced with "Location" as the shared filter dimension).
-  locations: EntityOption[]
   items: EntityOption[]
   sales_agents: EntityOption[]
   debtors: EntityOption[]
@@ -32,7 +28,6 @@ export interface FilterOptions {
 export interface Filters {
   date_from: string
   date_to: string
-  location: string
   item: string
   sales_agent: string
   debtor: string
@@ -57,8 +52,13 @@ export interface KpiSummary {
 }
 
 // One row per (bucket, currency) — bucket is an item name, an item group,
-// or an item type, depending on the active GroupByMode. Total value only
-// (Cash/Credit split, same shape as ItemBestSellerRow below).
+// or an item type, depending on the active GroupByMode. Same shape as
+// ItemBestSellerRow below.
+//
+// NOTE (applies to every row type here): the API splits amounts and
+// quantities by payment type, but the dashboard never displays that split —
+// every screen and export sums cash + credit into one figure. The fields
+// stay as the API's wire shape; do the summing at the point of display.
 export interface ItemRevenueRow {
   bucket_name: string
   currency: string
@@ -68,9 +68,8 @@ export interface ItemRevenueRow {
   cash_revenue: number
 }
 
-// Best Sellers table row — Cash/Credit split (not the chart's
-// Paid/Not-due/Overdue split). bucket_name is an item/group/type name
-// depending on the active GroupByMode.
+// Best Sellers table row — bucket_name is an item/group/type name depending
+// on the active GroupByMode.
 export interface ItemBestSellerRow {
   bucket_name: string
   currency: string
@@ -102,8 +101,8 @@ export interface MonthlyBreakdownRow {
 
 // --- Performance page ------------------------------------------------
 
-// Shared row shape across all 4 dimensions (Branch/Item/Sales Agent/
-// Debtor) — `name` is whichever entity that table represents.
+// Shared row shape across all 3 dimensions (Item/Sales Agent/Debtor) —
+// `name` is whichever entity that table represents.
 export interface PerformanceRow {
   name: string
   currency: string
@@ -115,8 +114,8 @@ export interface PerformanceRow {
 
 // --- Purchase page ---------------------------------------------------
 
-// Purchase-side twin of PerformanceRow — same 3 dimensions (Item/Group/
-// Type, Location, Creditor instead of Debtor), no Sales Agent (not a
+// Purchase-side twin of PerformanceRow — Item/Group/Type and Creditor
+// (instead of Debtor), no Sales Agent (not a
 // purchase-side concept). Named credit_purchase/cash_purchase, not
 // credit_revenue/cash_revenue — this is purchase spend, not revenue, and
 // reusing the revenue field names here would misrepresent what the number

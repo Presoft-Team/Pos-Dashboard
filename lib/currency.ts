@@ -30,6 +30,12 @@ export function formatAmount(amount: number): string {
   }).format(amount)
 }
 
+// Whole-unit quantity with thousands separators — qty columns are always
+// shown as one combined number (cash + credit summed).
+export function formatQty(qty: number): string {
+  return new Intl.NumberFormat('en-MY').format(qty)
+}
+
 export function formatMoney(amount: number, code: string | null | undefined): string {
   return `${currencySymbol(code)} ${formatAmount(amount)}`
 }
@@ -107,38 +113,30 @@ export function pivotRevenueByCurrency<T extends { currency: string; total_reven
 
 export const CHART_PALETTE = ['#F2AA24', '#5B8DEF', '#00D697', '#E85D75', '#9B59B6', '#F39C12']
 
-// Cash/Credit colors, shared by every Cash/Credit chart (Monthly trend).
-export const CASH_CREDIT_COLORS = {
-  cash: '#F2AA24',
-  credit: '#5B8DEF',
-}
-
-export interface CashCreditBreakdown {
+export interface MonthlyTrendBreakdown {
   currency: string
-  cash: number
-  credit: number
+  revenue: number
 }
 
-export interface CashCreditPivotRow {
+export interface MonthlyTrendPivotRow {
   name: string
-  // Magnitudes only (summed across currencies, no FX conversion) — used for
+  // Magnitude only (summed across currencies, no FX conversion) — used for
   // line height. Real per-currency numbers live in `breakdown`, for the
   // tooltip.
-  cash: number
-  credit: number
   total: number
-  breakdown: CashCreditBreakdown[]
+  breakdown: MonthlyTrendBreakdown[]
 }
 
-interface CashCreditRevenueRow {
+interface MonthlyRevenueRow {
   currency: string
   cash_revenue: number
   credit_revenue: number
 }
 
-// Cash/Credit pivot, chronological (by year/month) rather than ranked by
+// Monthly revenue pivot, chronological (by year/month) rather than ranked by
 // magnitude — for the Monthly Sales trend chart, which needs its months in
-// order, not sorted by size.
+// order, not sorted by size. Cash and credit are summed on the way in; the
+// chart shows one revenue line, not a payment-type split.
 //
 // The API only returns rows for months that actually had sales — a month
 // with $0 revenue is a missing row, not a zero row. Left as-is, that reads
@@ -146,20 +144,18 @@ interface CashCreditRevenueRow {
 // x-axis silently skips months. When dateFrom/dateTo are given, this fills
 // every month in that range with a zeroed entry before overlaying the real
 // rows, so gaps render as a flat 0 instead of vanishing.
-export function pivotMonthlyTrend<T extends CashCreditRevenueRow & { year: number; month: number }>(
+export function pivotMonthlyTrend<T extends MonthlyRevenueRow & { year: number; month: number }>(
   rows: T[],
   monthNames: string[],
   dateFrom?: string | null,
   dateTo?: string | null
-): CashCreditPivotRow[] {
-  const byMonth = new Map<string, CashCreditPivotRow>()
+): MonthlyTrendPivotRow[] {
+  const byMonth = new Map<string, MonthlyTrendPivotRow>()
   for (const row of rows) {
     const key = `${row.year}-${row.month}`
-    const entry = byMonth.get(key) ?? { name: `${monthNames[row.month]} ${row.year}`, cash: 0, credit: 0, total: 0, breakdown: [] }
-    entry.cash += row.cash_revenue
-    entry.credit += row.credit_revenue
+    const entry = byMonth.get(key) ?? { name: `${monthNames[row.month]} ${row.year}`, total: 0, breakdown: [] }
     entry.total += row.cash_revenue + row.credit_revenue
-    entry.breakdown.push({ currency: row.currency, cash: row.cash_revenue, credit: row.credit_revenue })
+    entry.breakdown.push({ currency: row.currency, revenue: row.cash_revenue + row.credit_revenue })
     byMonth.set(key, entry)
   }
 
@@ -186,6 +182,6 @@ export function pivotMonthlyTrend<T extends CashCreditRevenueRow & { year: numbe
     const existing = byMonth.get(key)
     if (existing) return existing
     const [y, m] = key.split('-').map(Number)
-    return { name: `${monthNames[m]} ${y}`, cash: 0, credit: 0, total: 0, breakdown: [] }
+    return { name: `${monthNames[m]} ${y}`, total: 0, breakdown: [] }
   })
 }

@@ -37,7 +37,6 @@ export function formatFilterSummary(filters: Filters, options?: FilterOptions): 
       ? `Date: ${filters.date_from || 'earliest'} to ${filters.date_to || 'latest'}`
       : 'Date: All'
   )
-  parts.push(`Location: ${filters.location ? nameOf(options?.locations, filters.location) : 'All'}`)
   parts.push(`Item: ${filters.item ? nameOf(options?.items, filters.item) : 'All'}`)
   parts.push(`Sales Agent: ${filters.sales_agent ? nameOf(options?.sales_agents, filters.sales_agent) : 'All'}`)
   parts.push(`Debtor: ${filters.debtor ? nameOf(options?.debtors, filters.debtor) : 'All'}`)
@@ -51,18 +50,17 @@ function fmtInt(n: unknown) {
   return new Intl.NumberFormat('en-MY').format(Number(n ?? 0))
 }
 
-// Shared column set for every Cash/Credit-split entity-revenue table —
-// Sales Dashboard's Best Sellers, and Performance's 4 breakdown tables.
-// nameKey/nameLabel let each caller supply its own first column
+// Shared column set for every entity-revenue table — Sales Dashboard's Best
+// Sellers, and Performance's 4 breakdown tables. The API's cash/credit split
+// is summed into one Qty and one Revenue column, matching what the on-screen
+// tables show. nameKey/nameLabel let each caller supply its own first column
 // (bucket_name for Best Sellers, name for Performance's 4 dimensions).
 export function entityRevenueColumns(nameKey: string, nameLabel: string): ExportColumn[] {
   return [
     { key: nameKey, label: nameLabel },
     { key: 'currency', label: 'Currency' },
-    { key: 'credit_qty', label: 'Credit Qty', align: 'right', formatForPdf: (r) => fmtInt(r.credit_qty) },
-    { key: 'cash_qty', label: 'Cash Qty', align: 'right', formatForPdf: (r) => fmtInt(r.cash_qty) },
-    { key: 'credit_revenue', label: 'Credit Revenue', align: 'right', formatForPdf: (r) => formatAmount(Number(r.credit_revenue ?? 0)) },
-    { key: 'cash_revenue', label: 'Cash Revenue', align: 'right', formatForPdf: (r) => formatAmount(Number(r.cash_revenue ?? 0)) },
+    { key: 'qty', label: 'Qty', align: 'right', formatForPdf: (r) => fmtInt(Number(r.credit_qty ?? 0) + Number(r.cash_qty ?? 0)) },
+    { key: 'revenue', label: 'Revenue', align: 'right', formatForPdf: (r) => formatAmount(Number(r.credit_revenue ?? 0) + Number(r.cash_revenue ?? 0)) },
   ]
 }
 
@@ -72,10 +70,8 @@ export function entityPurchaseColumns(nameKey: string, nameLabel: string): Expor
   return [
     { key: nameKey, label: nameLabel },
     { key: 'currency', label: 'Currency' },
-    { key: 'credit_qty', label: 'Credit Qty', align: 'right', formatForPdf: (r) => fmtInt(r.credit_qty) },
-    { key: 'cash_qty', label: 'Cash Qty', align: 'right', formatForPdf: (r) => fmtInt(r.cash_qty) },
-    { key: 'credit_purchase', label: 'Credit Purchase', align: 'right', formatForPdf: (r) => formatAmount(Number(r.credit_purchase ?? 0)) },
-    { key: 'cash_purchase', label: 'Cash Purchase', align: 'right', formatForPdf: (r) => formatAmount(Number(r.cash_purchase ?? 0)) },
+    { key: 'qty', label: 'Qty', align: 'right', formatForPdf: (r) => fmtInt(Number(r.credit_qty ?? 0) + Number(r.cash_qty ?? 0)) },
+    { key: 'purchase', label: 'Purchase', align: 'right', formatForPdf: (r) => formatAmount(Number(r.credit_purchase ?? 0) + Number(r.cash_purchase ?? 0)) },
   ]
 }
 

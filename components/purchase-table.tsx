@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { PurchaseRow } from '@/types'
-import { formatAmount } from '@/lib/currency'
+import { formatAmount, formatQty } from '@/lib/currency'
 
 interface Props {
   title: string
@@ -13,9 +13,9 @@ interface Props {
 const INITIAL_VISIBLE = 5
 const SHOW_MORE_STEP = 5
 
-// Purchase-side twin of PerformanceTable — same layout, but Credit/Cash
-// Purchase columns instead of Credit/Cash Revenue (this is purchase spend,
-// not revenue — a duplicated component rather than a relabeled shared one,
+// Purchase-side twin of PerformanceTable — same layout, but a Purchase
+// column instead of Revenue (this is purchase spend, not revenue — a
+// duplicated component rather than a relabeled shared one,
 // since PerformanceTable's column labels aren't parameterized and Sales/
 // Purchase are different enough domains that forcing one generic table to
 // serve both isn't worth the indirection for 3 dimensions each).
@@ -48,9 +48,8 @@ export default function PurchaseTable({ title, rows, loading }: Props) {
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide w-8">#</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Name</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Currency</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Credit Purchase</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Cash Purchase</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Total</th>
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Qty</th>
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Purchase</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -59,8 +58,7 @@ export default function PurchaseTable({ title, rows, loading }: Props) {
                   <td className="px-4 py-3 text-gray-400 font-medium">{i + 1}</td>
                   <td className="px-4 py-3 font-semibold text-gray-900">{row.name}</td>
                   <td className="px-4 py-3 text-gray-600">{row.currency}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(row.credit_purchase)}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(row.cash_purchase)}</td>
+                  <td className="px-4 py-3 text-right text-gray-600">{formatQty(row.credit_qty + row.cash_qty)}</td>
                   <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(row.credit_purchase + row.cash_purchase)}</td>
                 </tr>
               ))}

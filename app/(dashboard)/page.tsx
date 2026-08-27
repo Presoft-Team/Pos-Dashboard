@@ -87,7 +87,7 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Sales Dashboard</h1>
-          <p className="text-sm text-gray-500">Overview of all locations and items</p>
+          <p className="text-sm text-gray-500">Overview of all items</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <FilterBar

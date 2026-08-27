@@ -1,7 +1,7 @@
 'use client'
 
 import { ItemBestSellerRow } from '@/types'
-import { formatAmount } from '@/lib/currency'
+import { formatAmount, formatQty } from '@/lib/currency'
 
 interface Props {
   data: ItemBestSellerRow[]
@@ -10,7 +10,8 @@ interface Props {
 }
 
 // Top 5 Best Sellers table (PLAN.md Section 4) — one row per bucket per
-// currency, Cash/Credit split as columns. Bucket is an item/group/type name
+// currency, cash and credit summed into a single Qty/Revenue pair (the
+// dashboard never shows that split). Bucket is an item/group/type name
 // depending on the page's active GroupByMode; the backend already limits to
 // 5 rows and sorts by revenue, so no client-side sort/pagination here.
 export default function BestSellersTable({ data, loading, title = 'Best Sellers' }: Props) {
@@ -34,9 +35,8 @@ export default function BestSellersTable({ data, loading, title = 'Best Sellers'
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide w-8">#</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Item</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Currency</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Credit Revenue</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Cash Revenue</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Total</th>
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Qty</th>
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Revenue</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -45,8 +45,7 @@ export default function BestSellersTable({ data, loading, title = 'Best Sellers'
                   <td className="px-4 py-3 text-gray-400 font-medium">{i + 1}</td>
                   <td className="px-4 py-3 font-medium text-gray-900">{row.bucket_name || '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{row.currency}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(row.credit_revenue)}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(row.cash_revenue)}</td>
+                  <td className="px-4 py-3 text-right text-gray-600">{formatQty(row.credit_qty + row.cash_qty)}</td>
                   <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(row.credit_revenue + row.cash_revenue)}</td>
                 </tr>
               ))}

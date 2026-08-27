@@ -208,7 +208,7 @@ export default function ItemPage() {
     const t = setTimeout(fetchData, 300)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, sort, filters.location, filters.item, filters.item_group, filters.item_type])
+  }, [search, sort, filters.item, filters.item_group, filters.item_type])
 
   // The Item/Group/Type toggle swaps which of the 3 fields the dynamic
   // combobox filters by — clear the other two so switching modes doesn't
@@ -228,7 +228,6 @@ export default function ItemPage() {
       p_item: filters.item || null,
       p_item_group: filters.item_group || null,
       p_item_type: filters.item_type || null,
-      p_location: filters.location || null,
       p_sort: sort,
       p_limit: null,
     })
@@ -279,10 +278,9 @@ export default function ItemPage() {
         </p>
       </div>
 
-      {/* Filters — mobile: Search / Sort(60%)+Location(40%) / Toggle+Item,
-          each its own row; desktop: single wrapped line. Different enough
-          splits (mobile pairs Location with Sort, desktop pairs Location
-          with Search) that it's two layouts, same pattern as FilterBar. */}
+      {/* Filters — mobile: Search / Sort / Toggle+Item, each its own row;
+          desktop: Search+Sort, then Toggle+Item. Two layouts rather than one
+          responsive one, same pattern as FilterBar. */}
       <div className="sm:hidden space-y-2">
         <div className="relative w-full">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -294,20 +292,8 @@ export default function ItemPage() {
             className="w-full h-9 pl-9 pr-3 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
           />
         </div>
-        <div className="grid grid-cols-[3fr_2fr] gap-2">
-          <div className="min-w-0">
-            <SortSelect value={sort} options={SORT_OPTIONS} onChange={setSort} ariaLabel="Sort by" />
-          </div>
-          <div className="min-w-0">
-            <Combobox
-              value={filters.location}
-              onChange={(v) => setFilters({ ...filters, location: v })}
-              options={options.locations}
-              placeholder="All Locations"
-              ariaLabel="Location"
-              fullWidth
-            />
-          </div>
+        <div className="w-full">
+          <SortSelect value={sort} options={SORT_OPTIONS} onChange={setSort} ariaLabel="Sort by" />
         </div>
         <div className="flex gap-2">
           <div className="flex-1 min-w-0">
@@ -334,8 +320,10 @@ export default function ItemPage() {
             <SortSelect value={sort} options={SORT_OPTIONS} onChange={setSort} ariaLabel="Sort by" />
           </div>
         </div>
-        {/* Toggle 20% / Item-Group-Type combobox 40% / Location 40% — each
-            grid child wrapped in min-w-0, otherwise a grid item's default
+        {/* Toggle 20% / Item-Group-Type combobox 40% — the third track is
+            left empty (it held the Location filter) so the two remaining
+            fields keep the same widths as the rest of the layout. Each grid
+            child is wrapped in min-w-0, otherwise a grid item's default
             min-width is its content's intrinsic width, which overflows the
             cell instead of shrinking once the track gets this narrow. */}
         <div className="grid grid-cols-[2fr_4fr_4fr] gap-2">
@@ -343,16 +331,6 @@ export default function ItemPage() {
             <GroupByToggle value={groupBy} onChange={handleGroupByChange} />
           </div>
           <div className="min-w-0">{itemDynamic}</div>
-          <div className="min-w-0">
-            <Combobox
-              value={filters.location}
-              onChange={(v) => setFilters({ ...filters, location: v })}
-              options={options.locations}
-              placeholder="All Locations"
-              ariaLabel="Location"
-              fullWidth
-            />
-          </div>
         </div>
       </div>
 
