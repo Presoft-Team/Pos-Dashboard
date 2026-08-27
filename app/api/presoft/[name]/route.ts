@@ -1,13 +1,9 @@
 // Server-side proxy between the dashboard's browser code and presoft-api.
-// Replaces browser -> presoft-api direct calls (lib/db/client.ts used to
-// fetch presoft-api's own URL straight from the client) so the API key
-// required by presoft-api's /api/v1/* (see its src/middleware/apiKey.ts)
-// never reaches the browser bundle — only this server-side route ever
-// reads it. Not covered by proxy.ts's matcher (which excludes /api), so
-// this route does its own session + tenant-config resolution.
+// The API key required by presoft-api's /api/v1/* (see its
+// src/middleware/apiKey.ts) never reaches the browser bundle — only this
+// server-side route ever reads it.
 import { NextRequest, NextResponse } from 'next/server'
-import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth/jwt'
-import { getTenantApiConfig, tenantApiHeaders } from '@/lib/presoft-api'
+import { apiFetch } from '@/lib/presoft-api'
 
 // Maps the old Postgres RPC names every dashboard page still calls
 // (unchanged, via lib/db/client.ts) to presoft-api's REST paths.
@@ -35,25 +31,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: `Unknown RPC: ${name} (no presoft-api route mapped)` }, { status: 400 })
   }
 
-  const token = request.cookies.get(SESSION_COOKIE)?.value
-  const user = token ? verifySessionToken(token) : null
-  if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-  }
-
-  const tenantConfig = await getTenantApiConfig(user.businessId)
-  if (!tenantConfig) {
-    return NextResponse.json({ error: 'This business has not configured its presoft-api connection yet' }, { status: 409 })
-  }
-
-  let apiRes: Response
-  try {
-    apiRes = await fetch(`${tenantConfig.apiUrl}${path}${request.nextUrl.search}`, {
-      headers: tenantApiHeaders(tenantConfig.apiKey),
-    })
-  } catch {
-    return NextResponse.json({ error: 'Unable to reach presoft-api' }, { status: 502 })
-  }
+  const { res: apiRes, error } = await apiFetch(`${path}${request.nextUrl.search}`)
+  if (error) return error
 
   const body = await apiRes.json().catch(() => ({}))
   if (!apiRes.ok) {

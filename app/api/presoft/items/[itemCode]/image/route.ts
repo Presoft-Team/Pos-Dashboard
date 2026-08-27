@@ -4,33 +4,17 @@
 // with whatever Content-Type presoft-api sniffed, and needs a dynamic path
 // segment its dispatcher pattern doesn't support. Same reasoning as every
 // other route in this folder: only this server-side handler ever attaches
-// the tenant's api key, never the browser.
+// the api key, never the browser.
 import { NextRequest, NextResponse } from 'next/server'
-import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth/jwt'
-import { getTenantApiConfig, tenantApiHeaders } from '@/lib/presoft-api'
+import { apiFetch } from '@/lib/presoft-api'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ itemCode: string }> }) {
   const { itemCode } = await params
 
-  const token = request.cookies.get(SESSION_COOKIE)?.value
-  const user = token ? verifySessionToken(token) : null
-  if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-  }
-
-  const tenantConfig = await getTenantApiConfig(user.businessId)
-  if (!tenantConfig) {
-    return NextResponse.json({ error: 'This business has not configured its presoft-api connection yet' }, { status: 409 })
-  }
-
-  let apiRes: Response
-  try {
-    apiRes = await fetch(`${tenantConfig.apiUrl}/api/v1/items/${encodeURIComponent(itemCode)}/image`, {
-      headers: tenantApiHeaders(tenantConfig.apiKey),
-    })
-  } catch {
-    return NextResponse.json({ error: 'Unable to reach presoft-api' }, { status: 502 })
-  }
+  const { res: apiRes, error } = await apiFetch(
+    `/api/v1/items/${encodeURIComponent(itemCode)}/image`
+  )
+  if (error) return error
 
   if (!apiRes.ok) {
     const body = await apiRes.json().catch(() => ({}))

@@ -1,90 +1,96 @@
 # Presoft Dashboard Platform
 
-A Next.js dashboard (revenue, monthly trends, performance breakdowns, item catalog) over the AutoCount/Presoft SQL Server account book. This repo has no database credentials and no direct database access of its own for live data — it's a client of a separate service, **presoft-api**, which owns the real SQL Server connection.
+A Next.js dashboard (revenue, monthly trends, performance breakdowns, purchases, item catalog) over the AutoCount/Presoft SQL Server account book.
+
+This repo has **no database access of its own**. Every byte of data comes over HTTP from **presoft-api**, a separate service self-hosted on IIS that owns the real SQL Server connection.
 
 ## How it fits together
 
 ```
-Browser  ──>  This app (Next.js, :3000)  ──>  presoft-api (Express, separate repo, :4000)  ──>  SQL Server
+Browser  ──>  This app (Next.js, :3000)  ──>  presoft-api (IIS, e.g. 192.168.1.10:9000)  ──>  SQL Server
 ```
 
-The browser only ever talks to **this app's own server** — never to presoft-api directly. Two server-side proxy points make that true:
+The browser only ever talks to **this app's own server** — never to presoft-api directly. `app/api/presoft/[name]/route.ts` forwards data requests (`GET /api/presoft/get_kpi_summary_v2`, etc.) to presoft-api's REST endpoints, attaching the shared API key server-side.
 
-- `app/api/presoft/[name]/route.ts` — forwards data requests (`GET /api/presoft/get_kpi_summary_v2`, etc.) to presoft-api's REST endpoints, attaching a shared API key
-- `app/api/auth/login/route.ts` — forwards login credentials to presoft-api's `/api/v1/auth/login`, then sets the JWT it returns as an httpOnly cookie on this app's own origin
-
-This exists specifically so two secrets never reach the browser bundle: the **presoft-api API key** and the **session JWT**.
+That indirection exists for one reason: so the **API key never reaches the browser bundle**.
 
 ## Prerequisites
 
 - Node.js 20+
-- A running **presoft-api** instance, already connected to a SQL Server account book (via its own `/setup` page) with at least one login seeded (`npm run seed:admin` in that repo)
+- A running **presoft-api** instance on IIS, already connected to a SQL Server account book, reachable from the machine running this app
 
 ## Setup
 
 ```bash
 npm install
-cp .env.example .env.local
+cp .env.example .env
 ```
 
-Fill in `.env.local`:
+Fill in `.env`:
 
 | Var | Description |
 | --- | --- |
-| `PRESOFT_API_URL` | Where presoft-api is running, e.g. `http://localhost:4000` |
-| `PRESOFT_API_KEY` | Must match presoft-api's own `API_KEY` exactly |
-| `JWT_SECRET` | Must match presoft-api's own `JWT_SECRET` exactly (verifies the login session) |
+| `PRESOFT_API_URL` | The IIS site hosting presoft-api, e.g. `192.168.1.10:9000`. The `http://` is added for you if omitted. |
+| `PRESOFT_API_KEY` | Must match presoft-api's own `API_KEY` exactly — sent as `x-api-key` |
+| `PRESOFT_COMPANY_ID` | Account book to query — sent as `CompanyId` in the POST body of data endpoints |
 
-None of these are `NEXT_PUBLIC_`-prefixed on purpose — that prefix inlines a value into the client bundle, which would defeat the point of keeping them server-only.
+None of these are `NEXT_PUBLIC_`-prefixed on purpose: that prefix inlines a value into the client bundle, defeating the point of keeping the key server-only.
+
+Next reads env files **once at startup** — editing one while `npm run dev` is running has no effect until you fully stop and restart it.
 
 ```bash
 npm run dev
 ```
 
-Visit `http://localhost:3000` — you'll be redirected to `/login`. Log in with a user created via presoft-api's `npm run seed:admin -- <userId> <email> <password> [displayName] [role]`.
+Visit `http://localhost:3000`. There is no login; the dashboard loads straight to data.
 
-## How login works
+## No authentication
 
-1. Login form posts to this app's own `POST /api/auth/login`
-2. That route forwards the credentials to presoft-api's `POST /api/v1/auth/login` (with the API key attached), which checks them against `PosDashboardUser` and returns a signed JWT
-3. This app sets that JWT as an httpOnly `session` cookie on its own origin — the browser never sees the raw token
-4. `proxy.ts` verifies the cookie's JWT on every request and redirects to `/login` if it's missing/invalid
-5. `GET /api/auth/me` decodes the cookie server-side so client components (the sidebar) can show the current user's name/role
-6. `POST /api/auth/logout` clears the cookie
-
-Auth-mode note: presoft-api's SQL Server driver can only use one auth mode (Windows or SQL login) per running process — if you change it via presoft-api's `/setup` page, presoft-api needs a restart, not just this app.
+This app has no users, sessions, or login page. Anyone who can reach it gets the full dashboard, and presoft-api's own endpoints are gated by a shared API key rather than per-user auth. **Don't expose either service to an untrusted network as-is.**
 
 ## How data fetching works
 
-Every dashboard page still calls `createClient().rpc(name, params)` (`lib/db/client.ts`) — a shape kept intentionally close to the old Supabase-backed version so page code didn't need to change through the migration. Under the hood:
+Every dashboard page calls `createClient().rpc(name, params)` (`lib/db/client.ts`). Under the hood:
 
 1. `lib/db/client.ts` fetches this app's own `GET /api/presoft/[name]`
 2. `app/api/presoft/[name]/route.ts` maps that RPC name to presoft-api's real REST path, attaches the API key, and forwards the request
 3. presoft-api queries SQL Server and returns JSON, which flows back through the same chain
 
+## Checking the connection
+
+`/test` (not linked from nav) is a smoke test for the whole chain:
+
+- **API Connection** reads presoft-api's OpenAPI spec at `/docs.json` and lists every endpoint it advertises. On failure it names the stage — config missing, host unreachable, HTTP error, or "answered but not with JSON" (usually the URL points at the wrong IIS site).
+- **Call an endpoint** calls any path on presoft-api and shows status, latency, row count, and raw JSON.
+
+If a probe returns rows, the dashboard pages will work — they use the identical path.
+
 ## Project structure
 
 ```
 app/
-  (dashboard)/            main pages — overview, monthly, performance, item
-  login/                  login page
-  api/auth/               login, logout, me route handlers (session cookie)
+  (dashboard)/            main pages — overview, monthly, performance, purchase, item
+  (dashboard)/test/       connection smoke test (see above)
   api/presoft/[name]/     server-side proxy to presoft-api (data)
-  api/rpc/[name]/         internal direct-to-SQL-Server test route — see below
-  api/test/               ad-hoc data-integrity check routes, same caveat
-  api-docs/               Swagger UI for the internal /api/rpc dispatcher
+  api/presoft/items/…     binary passthrough for item images
+  api/test/connection/    reads presoft-api's /docs.json, reports failure stage
+  api/test/probe/         calls one arbitrary presoft-api path
+  api/test/credit-paid/   \ hookups for presoft-api endpoints that don't
+  api/test/join-integrity/ / exist yet — see Known loose ends
+  api/openapi.json/       proxies presoft-api's own spec
+  api-docs/               Swagger UI over that spec
 lib/
-  auth/jwt.ts             session cookie JWT verify (SessionUser, SESSION_COOKIE)
-  presoft-api.ts           shared PRESOFT_API_URL + API key header helper
+  presoft-api.ts          PRESOFT_API_URL/KEY resolution + apiFetch() helper
   db/client.ts            rpc() shim — calls this app's own /api/presoft/*
-  db/registry.ts,
-  db/queries/*, mssql.ts  direct SQL Server access, used only by /api/rpc and /api/test
-proxy.ts                  session-cookie auth gate (excludes /login, /api)
-components/sidebar.tsx    nav + account block, reads /api/auth/me
+  filters.ts              Filters -> query params
+  filter-context.tsx      shared filter/groupBy state across pages
+  currency.ts             per-currency money formatting + chart pivoting
+  export.tsx              column specs for the PNG/PDF export modal
+components/sidebar.tsx    nav
+types/index.ts            row shapes returned by presoft-api
 ```
 
 ## Known loose ends
 
-- `app/api/rpc/[name]`, `app/api/test/*`, and `app/(dashboard)/test` are an internal, direct-to-SQL-Server path kept for ad-hoc verification during the migration off Supabase — not on the live data path (that's presoft-api now) and safe to delete once you're confident presoft-api's numbers are correct.
-- The login page's "Forgot your password?" link points at `/forgot-password`, which has no route yet.
-- presoft-api's data endpoints (`/api/v1/*` besides `/setup`) are gated by a shared API key, not per-user auth — anyone with the key can call them, so treat the key like a password.
+- `/api/test/credit-paid` and `/api/test/join-integrity` are dashboard-side hookups for `/api/v1/test/*` endpoints that **don't exist on presoft-api yet**. Nothing calls them; they'll 404 until that side is built.
+- No authentication, as above.
