@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/db/client'
-import { GroupByMode, MonthlyBreakdownRow, MonthlyTrendRow } from '@/types'
+import { GroupByMode, MonthlyRow } from '@/types'
 import { toParams } from '@/lib/filters'
 import { useSharedFilters } from '@/lib/filter-context'
 import { formatAmount, pivotMonthlyTrend } from '@/lib/currency'
@@ -22,18 +22,18 @@ const BREAKDOWN_SHOW_MORE_STEP = 6
 const MONTHLY_COLUMNS: ExportColumn[] = [
   { key: 'month_label', label: 'Month' },
   { key: 'currency', label: 'Currency' },
-  { key: 'credit_revenue', label: 'Credit Revenue', align: 'right', formatForPdf: (r) => formatAmount(Number(r.credit_revenue ?? 0)) },
-  { key: 'cash_revenue', label: 'Cash Revenue', align: 'right', formatForPdf: (r) => formatAmount(Number(r.cash_revenue ?? 0)) },
-  { key: 'credit_qty', label: 'Credit Qty', align: 'right', formatForPdf: (r) => Number(r.credit_qty ?? 0).toLocaleString('en-MY') },
-  { key: 'cash_qty', label: 'Cash Qty', align: 'right', formatForPdf: (r) => Number(r.cash_qty ?? 0).toLocaleString('en-MY') },
+
+  // No Qty column: monthly figures come from AR documents, which carry
+  // amounts only — quantity exists on stock-document lines alone.
+  { key: 'revenue', label: 'Revenue', align: 'right', formatForPdf: (r) => formatAmount(Number(r.revenue ?? 0)) },
 ]
 
 export default function MonthlyPage() {
   const supabase = createClient()
 
   const { filters, setFilters, groupBy, setGroupBy, options } = useSharedFilters()
-  const [trend, setTrend] = useState<MonthlyTrendRow[]>([])
-  const [breakdown, setBreakdown] = useState<MonthlyBreakdownRow[]>([])
+  const [trend, setTrend] = useState<MonthlyRow[]>([])
+  const [breakdown, setBreakdown] = useState<MonthlyRow[]>([])
   const [loading, setLoading] = useState(true)
   const [exportOpen, setExportOpen] = useState(false)
   const [visibleCount, setVisibleCount] = useState(BREAKDOWN_INITIAL_VISIBLE)
@@ -76,13 +76,13 @@ export default function MonthlyPage() {
     if (trendRes.error) console.error('get_monthly_trend_v2 error:', trendRes.error.message)
     if (breakdownRes.error) console.error('get_monthly_breakdown_v2 error:', breakdownRes.error.message)
 
-    setTrend((trendRes.data as MonthlyTrendRow[]) ?? [])
-    setBreakdown((breakdownRes.data as MonthlyBreakdownRow[]) ?? [])
+    setTrend((trendRes.data as MonthlyRow[]) ?? [])
+    setBreakdown((breakdownRes.data as MonthlyRow[]) ?? [])
     setLoading(false)
   }
 
-  // 3 lines (Total, Cash, Credit), chronological — zero-sales months in the
-  // filtered range still get a row so they don't vanish from the x-axis.
+  // One Total line, chronological — zero-sales months in the filtered range
+  // still get a row so they don't vanish from the x-axis.
   const chartData = pivotMonthlyTrend(trend, MONTH_NAMES, filters.date_from, filters.date_to)
 
   const exportCharts: ExportChartSpec[] = [
@@ -174,9 +174,7 @@ export default function MonthlyPage() {
                   <tr className="bg-gray-50 text-left">
                     <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Month</th>
                     <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Currency</th>
-                    <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Credit Revenue</th>
-                    <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Cash Revenue</th>
-                    <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Total</th>
+                    <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Revenue</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -187,9 +185,7 @@ export default function MonthlyPage() {
                       <tr key={i} className={`hover:bg-gray-50 ${hasMultipleCurrencies && isLastOfMonth ? 'border-b-2 border-gray-300' : ''}`}>
                         <td className="px-4 py-3 font-medium text-gray-900">{MONTH_NAMES[m.month]} {m.year}</td>
                         <td className="px-4 py-3 text-gray-600">{m.currency}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(m.credit_revenue)}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(m.cash_revenue)}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(m.credit_revenue + m.cash_revenue)}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(m.revenue)}</td>
                       </tr>
                     )
                   })}

@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
-import { formatMoney, CASH_CREDIT_COLORS, CashCreditPivotRow } from '@/lib/currency'
+import { formatMoney, MonthlyTrendPivotRow } from '@/lib/currency'
 import { chooseRows, StaggeredTick, formatK } from '@/components/chart-axis-tick'
 
 const TOTAL_COLOR = '#111827'
@@ -12,29 +12,28 @@ const TOTAL_COLOR = '#111827'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
-  const row: CashCreditPivotRow | undefined = payload[0]?.payload
+  const row: MonthlyTrendPivotRow | undefined = payload[0]?.payload
   if (!row) return null
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm space-y-2">
+    <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm space-y-1">
       <p className="font-semibold text-gray-900">{label}</p>
       {row.breakdown.map((b) => (
-        <div key={b.currency}>
-          <p className="text-xs font-semibold text-gray-500">{b.currency}</p>
-          <p style={{ color: TOTAL_COLOR }}>Total: {formatMoney(b.cash + b.credit, b.currency)}</p>
-          <p style={{ color: CASH_CREDIT_COLORS.cash }}>Cash: {formatMoney(b.cash, b.currency)}</p>
-          <p style={{ color: CASH_CREDIT_COLORS.credit }}>Credit: {formatMoney(b.credit, b.currency)}</p>
-        </div>
+        <p key={b.currency} style={{ color: TOTAL_COLOR }}>
+          <span className="text-xs font-semibold text-gray-500">{b.currency}</span>{' '}
+          {formatMoney(b.revenue, b.currency)}
+        </p>
       ))}
     </div>
   )
 }
 
 interface Props {
-  data: CashCreditPivotRow[]
+  data: MonthlyTrendPivotRow[]
 }
 
-// 3 lines over time — Total, Cash, Credit. Values are cross-currency
-// magnitudes; hover/tap a point for the real per-currency breakdown.
+// One revenue line over time (cash and credit combined). Values are
+// cross-currency magnitudes; hover/tap a point for the real per-currency
+// breakdown.
 export default function MonthlyTrendChart({ data }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
@@ -66,10 +65,7 @@ export default function MonthlyTrendChart({ data }: Props) {
           />
           <YAxis tickFormatter={formatK} tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={52} />
           <Tooltip content={<CustomTooltip />} />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Line type="monotone" dataKey="total" name="Total" stroke={TOTAL_COLOR} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-          <Line type="monotone" dataKey="cash" name="Cash" stroke={CASH_CREDIT_COLORS.cash} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-          <Line type="monotone" dataKey="credit" name="Credit" stroke={CASH_CREDIT_COLORS.credit} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+          <Line type="monotone" dataKey="total" name="Revenue" stroke={TOTAL_COLOR} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
         </LineChart>
       </ResponsiveContainer>
     </div>

@@ -6,11 +6,9 @@ export interface EntityOption {
 }
 
 export interface FilterOptions {
-  // dbo.Location — unified across every page: Sales/Monthly/Performance
-  // filter sales/purchase docs by their own SalesLocation/PurchaseLocation,
-  // and Item filters stock by the same Location code (previously a
-  // page-local fetch via get_item_locations_v2, before "Branch" was
-  // replaced with "Location" as the shared filter dimension).
+  // dbo.Location — the Item page is the only consumer left: it filters stock
+  // by Location code. The shared FilterBar's Location filter and the
+  // Location breakdowns on Performance/Purchase were both removed.
   locations: EntityOption[]
   items: EntityOption[]
   sales_agents: EntityOption[]
@@ -25,13 +23,13 @@ export interface FilterOptions {
 }
 
 // The Global FilterBar (PLAN.md Section 3) — shared by Dashboard, Monthly,
-// Performance, Purchase, and Item pages. Entity fields hold an id (or '' for
-// "all"). Not every page shows every field (e.g. Purchase hides
-// sales_agent, shows creditor instead of debtor) — see FilterBar's
-// showSalesAgent/showDebtor/showCreditor props.
+// Performance, and Item pages. Entity fields hold an id (or '' for "all").
 export interface Filters {
   date_from: string
   date_to: string
+  // Written and read by the Item page alone. toParams() deliberately leaves
+  // it out, so a location picked on Item never silently narrows the sales/
+  // purchase pages that share this state.
   location: string
   item: string
   sales_agent: string
@@ -46,88 +44,101 @@ export type GroupByMode = 'item' | 'group' | 'type'
 
 // --- Sales Dashboard ---------------------------------------------------
 
+// Every row type below is produced by lib/presoft-aggregate.ts, not by the
+// company API directly — that API returns documents, so the dashboard's
+// own server routes do the aggregating. Two consequences show up in these
+// shapes:
+//
+//   - No cash/credit split. Revenue follows the AR ledger, where the
+//     distinction doesn't exist as a column.
+//   - No quantity outside the item rows. AR documents carry amounts only;
+//     qty exists solely on stock-document lines (see ItemBucketRow).
 export interface KpiSummary {
   currency: string
-  cash_revenue: number
-  credit_revenue: number
-  total_revenue: number     // cash_revenue + credit_revenue
-  cash_purchase: number
-  credit_purchase: number
-  total_purchase: number    // cash_purchase + credit_purchase
+  // ARInvoice + ARDebitNote - ARCreditNote - ARRefund, counting only detail
+  // lines whose AccNo is in the 5xxxx revenue range.
+  total_revenue: number
+  // Credit notes alone (ARCN + CN), as a positive magnitude. Already
+  // subtracted inside total_revenue — the tile reports it, it does not
+  // re-apply it.
+  credit_note_total: number
+  // APInvoice + APDebitNote - APCreditNote - PurchaseReturn, counting only
+  // detail lines whose AccNo is in the 6xxxx range. Shown on the Purchase
+  // page, not on the Sales Dashboard.
+  total_purchase: number
 }
 
-// One row per (bucket, currency) — bucket is an item name, an item group,
-// or an item type, depending on the active GroupByMode. Total value only
-// (Cash/Credit split, same shape as ItemBestSellerRow below).
-export interface ItemRevenueRow {
+// One row per bucket — an item, item group, or item type, depending on the
+// active GroupByMode. Reached by linking each AR document to the stock
+// document sharing its DocNo, so these figures cover only AR documents that
+// have a stock twin and will total less than total_revenue.
+export interface ItemBucketRow {
   bucket_name: string
   currency: string
-  credit_qty: number
-  cash_qty: number
-  credit_revenue: number
-  cash_revenue: number
-}
-
-// Best Sellers table row — Cash/Credit split (not the chart's
-// Paid/Not-due/Overdue split). bucket_name is an item/group/type name
-// depending on the active GroupByMode.
-export interface ItemBestSellerRow {
-  bucket_name: string
-  currency: string
-  credit_qty: number
-  cash_qty: number
-  credit_revenue: number
-  cash_revenue: number
+  qty: number
+  revenue: number
 }
 
 // --- Monthly Sales -------------------------------------------------------
 
-export interface MonthlyTrendRow {
+// Used by both the trend chart and the breakdown table — the same monthly
+// revenue figure, so there is no separate breakdown shape any more.
+export interface MonthlyRow {
   year: number
   month: number
   currency: string
-  cash_revenue: number
-  credit_revenue: number
-}
-
-export interface MonthlyBreakdownRow {
-  year: number
-  month: number
-  currency: string
-  credit_revenue: number
-  cash_revenue: number
-  credit_qty: number
-  cash_qty: number
+  revenue: number
 }
 
 // --- Performance page ------------------------------------------------
 
-// Shared row shape across all 4 dimensions (Branch/Item/Sales Agent/
-// Debtor) — `name` is whichever entity that table represents.
+// Sales Agent and Debtor breakdowns. Both read AR document headers, which
+// have no quantity — hence revenue only.
 export interface PerformanceRow {
   name: string
   currency: string
-  credit_qty: number
-  cash_qty: number
-  credit_revenue: number
-  cash_revenue: number
+  revenue: number
+}
+
+// The Item breakdown is the one Performance dimension sourced from stock
+// lines rather than AR headers, so it alone can report a quantity.
+export interface PerformanceItemRow extends PerformanceRow {
+  qty: number
 }
 
 // --- Purchase page ---------------------------------------------------
 
-// Purchase-side twin of PerformanceRow — same 3 dimensions (Item/Group/
-// Type, Location, Creditor instead of Debtor), no Sales Agent (not a
-// purchase-side concept). Named credit_purchase/cash_purchase, not
-// credit_revenue/cash_revenue — this is purchase spend, not revenue, and
-// reusing the revenue field names here would misrepresent what the number
-// means to anyone reading the API response.
+// Purchase-side twin of PerformanceRow — Item/Group/Type and Creditor
+// (instead of Debtor), no Sales Agent (not a purchase-side concept).
+// Named credit_purchase/cash_purchase, not credit_revenue/cash_revenue —
+// this is purchase spend, not revenue.
+//
+// Still the pre-migration shape: the Purchase page has not been moved onto
+// the company API yet, so nothing serves these rows today (see the purchase
+// RPCs missing from app/api/presoft/[name]/route.ts). Wiring it up means
+// aggregating APInvoice + APDebitNote - APCreditNote, mirroring the AR side
+// in lib/presoft-aggregate.ts.
+// Creditor breakdown. `purchase` rather than `revenue` — this is spend, not
+// income. No qty: it reads AP document headers, and the AP ledger has no
+// quantity column at all.
 export interface PurchaseRow {
   name: string
   currency: string
-  credit_qty: number
-  cash_qty: number
-  credit_purchase: number
-  cash_purchase: number
+  purchase: number
+}
+
+// The Item breakdown is the one Purchase dimension sourced from stock lines
+// (PIDTL/CPDTL/PRDTL) rather than AP headers, so it alone reports a qty.
+export interface PurchaseItemRow extends PurchaseRow {
+  qty: number
+}
+
+// The Purchase page's KPI tiles read the same get_kpi_summary_v2 response
+// as the Sales Dashboard; this is the subset of it they use.
+export interface PurchaseKpiSummary {
+  currency: string
+  total_purchase: number
+  total_revenue: number
 }
 
 // --- Item page -----------------------------------------------------------

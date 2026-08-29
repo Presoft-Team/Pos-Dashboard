@@ -1,22 +1,30 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { PerformanceRow } from '@/types'
-import { formatAmount } from '@/lib/currency'
+import { PerformanceItemRow, PerformanceRow } from '@/types'
+import { formatAmount, formatQty } from '@/lib/currency'
 
 interface Props {
   title: string
-  rows: PerformanceRow[]
+  rows: (PerformanceRow | PerformanceItemRow)[]
   loading?: boolean
+  // Only the Item breakdown has quantities — Sales Agent and Debtor come
+  // from AR document headers, which carry no Qty at all. Rather than print
+  // a column of zeroes there, the caller says whether it has one.
+  showQty?: boolean
+}
+
+function qtyOf(row: PerformanceRow | PerformanceItemRow): number {
+  return 'qty' in row ? row.qty : 0
 }
 
 const INITIAL_VISIBLE = 5
 const SHOW_MORE_STEP = 5
 
-// One of Performance's 4 breakdown tables (Location/Item/Sales Agent/Debtor)
+// One of Performance's 3 breakdown tables (Item/Sales Agent/Debtor)
 // — plain display, filtered only by the Global FilterBar above (click-to-
 // focus was removed).
-export default function PerformanceTable({ title, rows, loading }: Props) {
+export default function PerformanceTable({ title, rows, loading, showQty = false }: Props) {
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
 
   // Reset expansion when the underlying rows change (new filters/data).
@@ -46,9 +54,8 @@ export default function PerformanceTable({ title, rows, loading }: Props) {
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide w-8">#</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Name</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Currency</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Credit Revenue</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Cash Revenue</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Total</th>
+                {showQty && <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Qty</th>}
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Revenue</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -57,9 +64,8 @@ export default function PerformanceTable({ title, rows, loading }: Props) {
                   <td className="px-4 py-3 text-gray-400 font-medium">{i + 1}</td>
                   <td className="px-4 py-3 font-semibold text-gray-900">{row.name}</td>
                   <td className="px-4 py-3 text-gray-600">{row.currency}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(row.credit_revenue)}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(row.cash_revenue)}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(row.credit_revenue + row.cash_revenue)}</td>
+                  {showQty && <td className="px-4 py-3 text-right text-gray-600">{formatQty(qtyOf(row))}</td>}
+                  <td className="px-4 py-3 text-right font-semibold text-gray-900">{formatAmount(row.revenue)}</td>
                 </tr>
               ))}
             </tbody>

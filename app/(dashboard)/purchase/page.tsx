@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/db/client'
-import { GroupByMode, KpiSummary, PurchaseRow } from '@/types'
+import { GroupByMode, PurchaseItemRow, PurchaseKpiSummary, PurchaseRow } from '@/types'
 import { toParams } from '@/lib/filters'
 import { useSharedFilters } from '@/lib/filter-context'
 import { pivotRevenueByCurrency } from '@/lib/currency'
-import { entityPurchaseColumns } from '@/lib/export'
+import { entityPurchaseColumns, entityPurchaseOnlyColumns } from '@/lib/export'
 import PurchaseKpiCards from '@/components/purchase-kpi-cards'
 import FilterBar from '@/components/filter-bar'
 import CurrencyFilter from '@/components/currency-filter'
@@ -16,33 +16,32 @@ import PurchaseTable from '@/components/purchase-table'
 import ExportModal, { ExportChartSpec, ExportTableSpec } from '@/components/export-modal'
 import { Download } from 'lucide-react'
 
-const ENTITY_FIELDS = ['location', 'item', 'creditor'] as const
+const ENTITY_FIELDS = ['item', 'creditor'] as const
 type EntityField = (typeof ENTITY_FIELDS)[number]
 
 const GROUP_LABEL: Record<GroupByMode, string> = { item: 'Item', group: 'Group', type: 'Type' }
 
 const CHART_LIMIT = 5
 
-function chartData(rows: PurchaseRow[]) {
+function chartData(rows: (PurchaseRow | PurchaseItemRow)[]) {
   return pivotRevenueByCurrency(
-    rows.map((r) => ({ ...r, total_revenue: r.credit_purchase + r.cash_purchase, total_qty: r.credit_qty + r.cash_qty })),
+    rows.map((r) => ({ ...r, total_revenue: r.purchase, total_qty: 'qty' in r ? r.qty : 0 })),
     (r) => r.name,
     CHART_LIMIT
   )
 }
 
 // Purchase-side twin of Performance — same Top-N-breakdown-per-dimension
-// layout, but Item/Location/Creditor only (no Sales Agent, not a
+// layout, but Item/Creditor only (no Sales Agent, not a
 // purchase-side concept — see FilterBar's showSalesAgent prop), plus a KPI
-// row up top so Total/Cash/Credit Purchase can be read alongside Total
-// Revenue for a quick purchase-vs-revenue comparison.
+// row up top so Total Purchase can be read alongside Total Revenue for a
+// quick purchase-vs-revenue comparison.
 export default function PurchasePage() {
   const supabase = createClient()
 
   const { filters, setFilters, groupBy, setGroupBy, options } = useSharedFilters()
-  const [kpi, setKpi] = useState<KpiSummary[]>([])
-  const [locationRows, setLocationRows] = useState<PurchaseRow[]>([])
-  const [itemRows, setItemRows] = useState<PurchaseRow[]>([])
+  const [kpi, setKpi] = useState<PurchaseKpiSummary[]>([])
+  const [itemRows, setItemRows] = useState<PurchaseItemRow[]>([])
   const [creditorRows, setCreditorRows] = useState<PurchaseRow[]>([])
   const [loading, setLoading] = useState(true)
   const [exportOpen, setExportOpen] = useState(false)
@@ -64,20 +63,18 @@ export default function PurchasePage() {
     // let chartData() above re-slice down to 5 for the chart only.
     const p = { ...toParams(filters), p_limit: null }
 
-    const [kpiRes, locationRes, itemRes, creditorRes] = await Promise.all([
+    const [kpiRes, itemRes, creditorRes] = await Promise.all([
       supabase.rpc('get_kpi_summary_v2', toParams(filters)),
-      supabase.rpc('get_purchase_location_v2', p),
       supabase.rpc('get_purchase_item_v2', { ...p, p_group_by: groupBy }),
       supabase.rpc('get_purchase_creditor_v2', p),
     ])
 
-    for (const [label, res] of [['kpi_summary', kpiRes], ['location', locationRes], ['item', itemRes], ['creditor', creditorRes]] as const) {
+    for (const [label, res] of [['kpi_summary', kpiRes], ['item', itemRes], ['creditor', creditorRes]] as const) {
       if (res.error) console.error(`get_purchase_${label}_v2 error:`, res.error.message)
     }
 
-    setKpi((kpiRes.data as KpiSummary[]) ?? [])
-    setLocationRows((locationRes.data as PurchaseRow[]) ?? [])
-    setItemRows((itemRes.data as PurchaseRow[]) ?? [])
+    setKpi((kpiRes.data as PurchaseKpiSummary[]) ?? [])
+    setItemRows((itemRes.data as PurchaseItemRow[]) ?? [])
     setCreditorRows((creditorRes.data as PurchaseRow[]) ?? [])
     setLoading(false)
   }
@@ -85,7 +82,6 @@ export default function PurchasePage() {
   const itemLabel = GROUP_LABEL[groupBy]
   const sections: { field: EntityField; title: string; rows: PurchaseRow[] }[] = [
     { field: 'item', title: `${itemLabel} Breakdown`, rows: itemRows },
-    { field: 'location', title: 'Location Breakdown', rows: locationRows },
     { field: 'creditor', title: 'Creditor Breakdown', rows: creditorRows },
   ]
   // A dimension with no rows for the current filters has nothing to chart
@@ -99,7 +95,12 @@ export default function PurchasePage() {
   }))
   const exportTables: ExportTableSpec[] = visibleSections.map((s) => ({
     id: `${s.field}-table`, label: s.title,
-    columns: entityPurchaseColumns('name', s.field === 'item' ? itemLabel : s.title.split(' Breakdown')[0]),
+    // Only the Item breakdown has quantities — the Creditor one reads AP
+    // document headers, which carry none, so it would export a column of
+    // zeroes.
+    columns: s.field === 'item'
+      ? entityPurchaseColumns('name', itemLabel)
+      : entityPurchaseOnlyColumns('name', s.title.split(' Breakdown')[0]),
     rows: s.rows as unknown as Record<string, unknown>[],
   }))
 
@@ -108,7 +109,7 @@ export default function PurchasePage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Purchase</h1>
-          <p className="text-sm text-gray-500">Location, Item, and Creditor purchase performance</p>
+          <p className="text-sm text-gray-500">Item and Creditor purchase performance</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <FilterBar
@@ -171,7 +172,7 @@ export default function PurchasePage() {
       {/* Tables */}
       <div className="space-y-4">
         {visibleSections.map((s) => (
-          <PurchaseTable key={s.field} title={s.title} rows={s.rows} loading={loading} />
+          <PurchaseTable key={s.field} title={s.title} rows={s.rows} loading={loading} showQty={s.field === 'item'} />
         ))}
       </div>
 

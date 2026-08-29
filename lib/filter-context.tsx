@@ -20,7 +20,7 @@ const FilterContext = createContext<FilterContextValue | null>(null)
 // Shared filter state for every (dashboard) page — Sales Dashboard, Monthly
 // Sales, Performance, and Item all read/write the same `filters`/`groupBy`/
 // `options` instead of each keeping its own, so switching pages keeps
-// whatever Location/Item/Sales Agent/Debtor/date-range/currency was set
+// whatever Item/Sales Agent/Debtor/date-range/currency was set
 // instead of resetting to defaults. Lives above <DashboardShell> in the
 // (dashboard) layout, so it's created once per session, not per page visit.
 export function FilterProvider({ children }: { children: ReactNode }) {
@@ -29,7 +29,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<FilterOptions>(DEFAULT_OPTIONS)
 
   // Fetched once per session here instead of once per page — the dropdown
-  // lists (locations/items/agents/debtors/...) don't depend on which page
+  // lists (items/agents/debtors/...) don't depend on which page
   // you're on, so every page reads the same fetch instead of re-requesting it.
   useEffect(() => {
     const supabase = createClient()

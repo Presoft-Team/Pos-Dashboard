@@ -37,7 +37,6 @@ export function formatFilterSummary(filters: Filters, options?: FilterOptions): 
       ? `Date: ${filters.date_from || 'earliest'} to ${filters.date_to || 'latest'}`
       : 'Date: All'
   )
-  parts.push(`Location: ${filters.location ? nameOf(options?.locations, filters.location) : 'All'}`)
   parts.push(`Item: ${filters.item ? nameOf(options?.items, filters.item) : 'All'}`)
   parts.push(`Sales Agent: ${filters.sales_agent ? nameOf(options?.sales_agents, filters.sales_agent) : 'All'}`)
   parts.push(`Debtor: ${filters.debtor ? nameOf(options?.debtors, filters.debtor) : 'All'}`)
@@ -51,18 +50,37 @@ function fmtInt(n: unknown) {
   return new Intl.NumberFormat('en-MY').format(Number(n ?? 0))
 }
 
-// Shared column set for every Cash/Credit-split entity-revenue table —
-// Sales Dashboard's Best Sellers, and Performance's 4 breakdown tables.
-// nameKey/nameLabel let each caller supply its own first column
-// (bucket_name for Best Sellers, name for Performance's 4 dimensions).
+// Column set for the item-sourced tables — Sales Dashboard's Best Sellers
+// and Performance's Item breakdown. Those come from stock-document lines,
+// which is why they can carry a Qty; see entityRevenueOnlyColumns below for
+// the AR-sourced tables that can't. nameKey/nameLabel let each caller supply
+// its own first column (bucket_name for Best Sellers, name for Performance).
 export function entityRevenueColumns(nameKey: string, nameLabel: string): ExportColumn[] {
   return [
     { key: nameKey, label: nameLabel },
     { key: 'currency', label: 'Currency' },
-    { key: 'credit_qty', label: 'Credit Qty', align: 'right', formatForPdf: (r) => fmtInt(r.credit_qty) },
-    { key: 'cash_qty', label: 'Cash Qty', align: 'right', formatForPdf: (r) => fmtInt(r.cash_qty) },
-    { key: 'credit_revenue', label: 'Credit Revenue', align: 'right', formatForPdf: (r) => formatAmount(Number(r.credit_revenue ?? 0)) },
-    { key: 'cash_revenue', label: 'Cash Revenue', align: 'right', formatForPdf: (r) => formatAmount(Number(r.cash_revenue ?? 0)) },
+    { key: 'qty', label: 'Qty', align: 'right', formatForPdf: (r) => fmtInt(r.qty) },
+    { key: 'revenue', label: 'Revenue', align: 'right', formatForPdf: (r) => formatAmount(Number(r.revenue ?? 0)) },
+  ]
+}
+
+// Purchase twin of entityRevenueOnlyColumns — for the Creditor breakdown,
+// whose rows come from AP document headers and so carry no quantity.
+export function entityPurchaseOnlyColumns(nameKey: string, nameLabel: string): ExportColumn[] {
+  return [
+    { key: nameKey, label: nameLabel },
+    { key: 'currency', label: 'Currency' },
+    { key: 'purchase', label: 'Purchase', align: 'right', formatForPdf: (r) => formatAmount(Number(r.purchase ?? 0)) },
+  ]
+}
+
+// Revenue-only variant, for the tables whose rows come from AR document
+// headers (Sales Agent, Debtor, Monthly) — those carry no quantity.
+export function entityRevenueOnlyColumns(nameKey: string, nameLabel: string): ExportColumn[] {
+  return [
+    { key: nameKey, label: nameLabel },
+    { key: 'currency', label: 'Currency' },
+    { key: 'revenue', label: 'Revenue', align: 'right', formatForPdf: (r) => formatAmount(Number(r.revenue ?? 0)) },
   ]
 }
 
@@ -72,10 +90,8 @@ export function entityPurchaseColumns(nameKey: string, nameLabel: string): Expor
   return [
     { key: nameKey, label: nameLabel },
     { key: 'currency', label: 'Currency' },
-    { key: 'credit_qty', label: 'Credit Qty', align: 'right', formatForPdf: (r) => fmtInt(r.credit_qty) },
-    { key: 'cash_qty', label: 'Cash Qty', align: 'right', formatForPdf: (r) => fmtInt(r.cash_qty) },
-    { key: 'credit_purchase', label: 'Credit Purchase', align: 'right', formatForPdf: (r) => formatAmount(Number(r.credit_purchase ?? 0)) },
-    { key: 'cash_purchase', label: 'Cash Purchase', align: 'right', formatForPdf: (r) => formatAmount(Number(r.cash_purchase ?? 0)) },
+    { key: 'qty', label: 'Qty', align: 'right', formatForPdf: (r) => fmtInt(r.qty) },
+    { key: 'purchase', label: 'Purchase', align: 'right', formatForPdf: (r) => formatAmount(Number(r.purchase ?? 0)) },
   ]
 }
 

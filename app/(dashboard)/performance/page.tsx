@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/db/client'
-import { GroupByMode, PerformanceRow } from '@/types'
+import { GroupByMode, PerformanceItemRow, PerformanceRow } from '@/types'
 import { toParams } from '@/lib/filters'
 import { useSharedFilters } from '@/lib/filter-context'
 import { pivotRevenueByCurrency } from '@/lib/currency'
-import { entityRevenueColumns } from '@/lib/export'
+import { entityRevenueColumns, entityRevenueOnlyColumns } from '@/lib/export'
 import FilterBar from '@/components/filter-bar'
 import CurrencyFilter from '@/components/currency-filter'
 import DatePresetFilter from '@/components/date-preset-filter'
@@ -15,16 +15,16 @@ import PerformanceTable from '@/components/performance-table'
 import ExportModal, { ExportChartSpec, ExportTableSpec } from '@/components/export-modal'
 import { Download } from 'lucide-react'
 
-const ENTITY_FIELDS = ['location', 'item', 'sales_agent', 'debtor'] as const
+const ENTITY_FIELDS = ['item', 'sales_agent', 'debtor'] as const
 type EntityField = (typeof ENTITY_FIELDS)[number]
 
 const GROUP_LABEL: Record<GroupByMode, string> = { item: 'Item', group: 'Group', type: 'Type' }
 
 const CHART_LIMIT = 5
 
-function chartData(rows: PerformanceRow[]) {
+function chartData(rows: (PerformanceRow | PerformanceItemRow)[]) {
   return pivotRevenueByCurrency(
-    rows.map((r) => ({ ...r, total_revenue: r.credit_revenue + r.cash_revenue, total_qty: r.credit_qty + r.cash_qty })),
+    rows.map((r) => ({ ...r, total_revenue: r.revenue, total_qty: 'qty' in r ? r.qty : 0 })),
     (r) => r.name,
     CHART_LIMIT
   )
@@ -34,8 +34,7 @@ export default function PerformancePage() {
   const supabase = createClient()
 
   const { filters, setFilters, groupBy, setGroupBy, options } = useSharedFilters()
-  const [locationRows, setLocationRows] = useState<PerformanceRow[]>([])
-  const [itemRows, setItemRows] = useState<PerformanceRow[]>([])
+  const [itemRows, setItemRows] = useState<PerformanceItemRow[]>([])
   const [agentRows, setAgentRows] = useState<PerformanceRow[]>([])
   const [debtorRows, setDebtorRows] = useState<PerformanceRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -53,36 +52,33 @@ export default function PerformancePage() {
 
   async function fetchData() {
     setLoading(true)
-    // All 4 functions now accept every entity filter, including their own
+    // All 3 functions now accept every entity filter, including their own
     // dimension — filtering by "Ah Chong" collapses the Sales Agent table
-    // to just his row too, not only the other 3.
+    // to just his row too, not only the other 2.
     // p_limit defaults to 5 server-side (it feeds the "Top 5" chart) — the
     // breakdown tables need the full set, so pass null (= no LIMIT) here and
     // let chartData() above re-slice down to 5 for the chart only.
     const p = { ...toParams(filters), p_limit: null }
 
-    const [locationRes, itemRes, agentRes, debtorRes] = await Promise.all([
-      supabase.rpc('get_performance_location_v2', p),
+    const [itemRes, agentRes, debtorRes] = await Promise.all([
       supabase.rpc('get_performance_item_v2', { ...p, p_group_by: groupBy }),
       supabase.rpc('get_performance_sales_agent_v2', p),
       supabase.rpc('get_performance_debtor_v2', p),
     ])
 
-    for (const [label, res] of [['location', locationRes], ['item', itemRes], ['sales_agent', agentRes], ['debtor', debtorRes]] as const) {
+    for (const [label, res] of [['item', itemRes], ['sales_agent', agentRes], ['debtor', debtorRes]] as const) {
       if (res.error) console.error(`get_performance_${label}_v2 error:`, res.error.message)
     }
 
-    setLocationRows((locationRes.data as PerformanceRow[]) ?? [])
-    setItemRows((itemRes.data as PerformanceRow[]) ?? [])
+    setItemRows((itemRes.data as PerformanceItemRow[]) ?? [])
     setAgentRows((agentRes.data as PerformanceRow[]) ?? [])
     setDebtorRows((debtorRes.data as PerformanceRow[]) ?? [])
     setLoading(false)
   }
 
   const itemLabel = GROUP_LABEL[groupBy]
-  const sections: { field: EntityField; title: string; rows: PerformanceRow[] }[] = [
+  const sections: { field: EntityField; title: string; rows: (PerformanceRow | PerformanceItemRow)[] }[] = [
     { field: 'item', title: `${itemLabel} Breakdown`, rows: itemRows },
-    { field: 'location', title: 'Location Breakdown', rows: locationRows },
     { field: 'sales_agent', title: 'Sales Agent Breakdown', rows: agentRows },
     { field: 'debtor', title: 'Debtor Breakdown', rows: debtorRows },
   ]
@@ -97,7 +93,9 @@ export default function PerformancePage() {
   }))
   const exportTables: ExportTableSpec[] = visibleSections.map((s) => ({
     id: `${s.field}-table`, label: s.title,
-    columns: entityRevenueColumns('name', s.field === 'item' ? itemLabel : s.title.split(' Breakdown')[0]),
+    columns: s.field === 'item'
+      ? entityRevenueColumns('name', itemLabel)
+      : entityRevenueOnlyColumns('name', s.title.split(' Breakdown')[0]),
     rows: s.rows as unknown as Record<string, unknown>[],
   }))
 
@@ -106,7 +104,7 @@ export default function PerformancePage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Performance</h1>
-          <p className="text-sm text-gray-500">Location, Item, Sales Agent, and Debtor performance</p>
+          <p className="text-sm text-gray-500">Item, Sales Agent, and Debtor performance</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <FilterBar
@@ -163,7 +161,7 @@ export default function PerformancePage() {
       {/* Tables */}
       <div className="space-y-4">
         {visibleSections.map((s) => (
-          <PerformanceTable key={s.field} title={s.title} rows={s.rows} loading={loading} />
+          <PerformanceTable key={s.field} title={s.title} rows={s.rows} loading={loading} showQty={s.field === 'item'} />
         ))}
       </div>
 

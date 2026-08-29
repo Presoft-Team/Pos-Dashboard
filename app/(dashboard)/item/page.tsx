@@ -228,6 +228,8 @@ export default function ItemPage() {
       p_item: filters.item || null,
       p_item_group: filters.item_group || null,
       p_item_type: filters.item_type || null,
+      // The one page that still filters by Location — passed explicitly
+      // rather than via toParams(), which no longer sends p_location.
       p_location: filters.location || null,
       p_sort: sort,
       p_limit: null,
@@ -282,7 +284,9 @@ export default function ItemPage() {
       {/* Filters — mobile: Search / Sort(60%)+Location(40%) / Toggle+Item,
           each its own row; desktop: single wrapped line. Different enough
           splits (mobile pairs Location with Sort, desktop pairs Location
-          with Search) that it's two layouts, same pattern as FilterBar. */}
+          with Search) that it's two layouts, same pattern as FilterBar.
+          Location lives here and nowhere else — it was removed from the
+          shared FilterBar, so this page owns the only one left. */}
       <div className="sm:hidden space-y-2">
         <div className="relative w-full">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />

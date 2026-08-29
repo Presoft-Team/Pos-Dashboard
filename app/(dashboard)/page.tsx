@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/db/client'
-import { GroupByMode, ItemBestSellerRow, ItemRevenueRow, KpiSummary } from '@/types'
+import { GroupByMode, ItemBucketRow, KpiSummary } from '@/types'
 import { toParams } from '@/lib/filters'
 import { useSharedFilters } from '@/lib/filter-context'
 import { pivotRevenueByCurrency } from '@/lib/currency'
@@ -23,8 +23,8 @@ export default function DashboardPage() {
 
   const { filters, setFilters, groupBy, setGroupBy, options } = useSharedFilters()
   const [kpi, setKpi] = useState<KpiSummary[]>([])
-  const [itemRevenue, setItemRevenue] = useState<ItemRevenueRow[]>([])
-  const [bestSellers, setBestSellers] = useState<ItemBestSellerRow[]>([])
+  const [itemRevenue, setItemRevenue] = useState<ItemBucketRow[]>([])
+  const [bestSellers, setBestSellers] = useState<ItemBucketRow[]>([])
   const [loading, setLoading] = useState(true)
   const [exportOpen, setExportOpen] = useState(false)
 
@@ -53,14 +53,14 @@ export default function DashboardPage() {
     if (bestSellersRes.error) console.error('get_item_best_sellers_v2 error:', bestSellersRes.error.message)
 
     setKpi((kpiRes.data as KpiSummary[]) ?? [])
-    setItemRevenue((itemRevenueRes.data as ItemRevenueRow[]) ?? [])
-    setBestSellers((bestSellersRes.data as ItemBestSellerRow[]) ?? [])
+    setItemRevenue((itemRevenueRes.data as ItemBucketRow[]) ?? [])
+    setBestSellers((bestSellersRes.data as ItemBucketRow[]) ?? [])
     setLoading(false)
   }
 
   // Top 5 + "Other" — see PLAN.md Section 4.
   const chartData = pivotRevenueByCurrency(
-    itemRevenue.map((r) => ({ ...r, total_revenue: r.credit_revenue + r.cash_revenue, total_qty: r.credit_qty + r.cash_qty })),
+    itemRevenue.map((r) => ({ ...r, total_revenue: r.revenue, total_qty: r.qty })),
     (r) => r.bucket_name,
     5,
     true
@@ -87,7 +87,7 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Sales Dashboard</h1>
-          <p className="text-sm text-gray-500">Overview of all locations and items</p>
+          <p className="text-sm text-gray-500">Overview of all items</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <FilterBar
