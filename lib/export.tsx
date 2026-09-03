@@ -9,7 +9,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import html2canvas from 'html2canvas-pro'
 import jsPDF from 'jspdf'
 import { Filters, FilterOptions, EntityOption } from '@/types'
-import { formatAmount } from '@/lib/currency'
+import { formatMoney } from '@/lib/currency'
 
 // Portrait PDF pages are taller than wide, so capturing at full desktop width
 // (~1280px) produces a landscape-shaped image that wastes most of the page.
@@ -50,17 +50,26 @@ function fmtInt(n: unknown) {
   return new Intl.NumberFormat('en-MY').format(Number(n ?? 0))
 }
 
-// Column set for the item-sourced tables — Sales Dashboard's Best Sellers
-// and Performance's Item breakdown. Those come from stock-document lines,
-// which is why they can carry a Qty; see entityRevenueOnlyColumns below for
-// the AR-sourced tables that can't. nameKey/nameLabel let each caller supply
-// its own first column (bucket_name for Best Sellers, name for Performance).
+// Money column with the currency printed alongside the figure ("RM 1,234.00")
+// rather than split into a Currency column of its own — the PDF mirrors what
+// the on-screen tables show. Excel is unaffected: it always receives the raw
+// numeric row[key], so amounts stay sortable and summable in a spreadsheet.
+function money(key: string, label: string): ExportColumn {
+  return {
+    key, label, align: 'right',
+    formatForPdf: (r) => formatMoney(Number(r[key] ?? 0), String(r.currency ?? '')),
+  }
+}
+
+// Column set for the item-sourced tables — the Sales page's Item breakdown.
+// Those come from stock-document lines, which is why they can carry a Qty;
+// see entityRevenueOnlyColumns below for the AR-sourced tables that can't.
+// nameKey/nameLabel let each caller supply its own first column.
 export function entityRevenueColumns(nameKey: string, nameLabel: string): ExportColumn[] {
   return [
     { key: nameKey, label: nameLabel },
-    { key: 'currency', label: 'Currency' },
     { key: 'qty', label: 'Qty', align: 'right', formatForPdf: (r) => fmtInt(r.qty) },
-    { key: 'revenue', label: 'Revenue', align: 'right', formatForPdf: (r) => formatAmount(Number(r.revenue ?? 0)) },
+    money('revenue', 'Revenue'),
   ]
 }
 
@@ -69,8 +78,7 @@ export function entityRevenueColumns(nameKey: string, nameLabel: string): Export
 export function entityPurchaseOnlyColumns(nameKey: string, nameLabel: string): ExportColumn[] {
   return [
     { key: nameKey, label: nameLabel },
-    { key: 'currency', label: 'Currency' },
-    { key: 'purchase', label: 'Purchase', align: 'right', formatForPdf: (r) => formatAmount(Number(r.purchase ?? 0)) },
+    money('purchase', 'Purchase'),
   ]
 }
 
@@ -79,8 +87,7 @@ export function entityPurchaseOnlyColumns(nameKey: string, nameLabel: string): E
 export function entityRevenueOnlyColumns(nameKey: string, nameLabel: string): ExportColumn[] {
   return [
     { key: nameKey, label: nameLabel },
-    { key: 'currency', label: 'Currency' },
-    { key: 'revenue', label: 'Revenue', align: 'right', formatForPdf: (r) => formatAmount(Number(r.revenue ?? 0)) },
+    money('revenue', 'Revenue'),
   ]
 }
 
@@ -89,9 +96,23 @@ export function entityRevenueOnlyColumns(nameKey: string, nameLabel: string): Ex
 export function entityPurchaseColumns(nameKey: string, nameLabel: string): ExportColumn[] {
   return [
     { key: nameKey, label: nameLabel },
-    { key: 'currency', label: 'Currency' },
     { key: 'qty', label: 'Qty', align: 'right', formatForPdf: (r) => fmtInt(r.qty) },
-    { key: 'purchase', label: 'Purchase', align: 'right', formatForPdf: (r) => formatAmount(Number(r.purchase ?? 0)) },
+    money('purchase', 'Purchase'),
+  ]
+}
+
+// Columns for the Recent Sales / Recent Purchases document lists. One row
+// per document rather than per bucket, so the first column is a doc no, not
+// an entity name. `showAgent` is false on the purchase side, where AP
+// documents carry no sales agent.
+export function documentColumns(partyLabel: string, showAgent: boolean): ExportColumn[] {
+  return [
+    { key: 'doc_date', label: 'Date', formatForPdf: (r) => String(r.doc_date ?? '').slice(0, 10) },
+    { key: 'doc_no', label: 'Doc No' },
+    { key: 'doc_type', label: 'Type' },
+    { key: 'party_name', label: partyLabel },
+    ...(showAgent ? [{ key: 'agent', label: 'Agent' } as ExportColumn] : []),
+    money('amount', 'Amount'),
   ]
 }
 

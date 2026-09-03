@@ -8,7 +8,7 @@ export interface EntityOption {
 export interface FilterOptions {
   // dbo.Location — the Item page is the only consumer left: it filters stock
   // by Location code. The shared FilterBar's Location filter and the
-  // Location breakdowns on Performance/Purchase were both removed.
+  // Location breakdowns on Sales/Purchase were both removed.
   locations: EntityOption[]
   items: EntityOption[]
   sales_agents: EntityOption[]
@@ -22,8 +22,8 @@ export interface FilterOptions {
   date_max: string | null
 }
 
-// The Global FilterBar (PLAN.md Section 3) — shared by Dashboard, Monthly,
-// Performance, and Item pages. Entity fields hold an id (or '' for "all").
+// The Global FilterBar (PLAN.md Section 3) — shared by Monthly (the landing
+// page), Sales, Purchase, and Item. Entity fields hold an id (or '' for "all").
 export interface Filters {
   date_from: string
   date_to: string
@@ -42,7 +42,7 @@ export interface Filters {
 
 export type GroupByMode = 'item' | 'group' | 'type'
 
-// --- Sales Dashboard ---------------------------------------------------
+// --- Sales page KPIs / shared aggregates --------------------------------
 
 // Every row type below is produced by lib/presoft-aggregate.ts, not by the
 // company API directly — that API returns documents, so the dashboard's
@@ -52,7 +52,7 @@ export type GroupByMode = 'item' | 'group' | 'type'
 //   - No cash/credit split. Revenue follows the AR ledger, where the
 //     distinction doesn't exist as a column.
 //   - No quantity outside the item rows. AR documents carry amounts only;
-//     qty exists solely on stock-document lines (see ItemBucketRow).
+//     qty exists solely on stock-document lines (see PerformanceItemRow).
 export interface KpiSummary {
   currency: string
   // ARInvoice + ARDebitNote - ARCreditNote - ARRefund, counting only detail
@@ -64,38 +64,37 @@ export interface KpiSummary {
   credit_note_total: number
   // APInvoice + APDebitNote - APCreditNote - PurchaseReturn, counting only
   // detail lines whose AccNo is in the 6xxxx range. Shown on the Purchase
-  // page, not on the Sales Dashboard.
+  // page, not on the Sales page.
   total_purchase: number
-}
-
-// One row per bucket — an item, item group, or item type, depending on the
-// active GroupByMode. Reached by linking each AR document to the stock
-// document sharing its DocNo, so these figures cover only AR documents that
-// have a stock twin and will total less than total_revenue.
-export interface ItemBucketRow {
-  bucket_name: string
-  currency: string
-  qty: number
-  revenue: number
 }
 
 // --- Monthly Sales -------------------------------------------------------
 
 // Used by both the trend chart and the breakdown table — the same monthly
-// revenue figure, so there is no separate breakdown shape any more.
+// figures, so there is no separate breakdown shape any more.
 export interface MonthlyRow {
   year: number
   month: number
   currency: string
   revenue: number
+  // Purchase spend for the same month, from the AP/stock-purchase side.
+  // A month can legitimately have one and not the other (spend in a month
+  // with no sales, or vice versa) — the missing side comes back as 0
+  // rather than as an absent row.
+  purchase: number
 }
 
-// --- Performance page ------------------------------------------------
+// --- Sales page (was Performance) -------------------------------------
 
 // Sales Agent and Debtor breakdowns. Both read AR document headers, which
 // have no quantity — hence revenue only.
 export interface PerformanceRow {
   name: string
+  // The entity's own identifier, for drilling into its detail overlay:
+  // the debtor's AccNo, or the agent's own name (agents have no master
+  // table, so the name *is* the key). Absent on the Item breakdown, whose
+  // bucket may be a group/type label rather than a single entity.
+  code?: string
   currency: string
   revenue: number
 }
@@ -123,6 +122,9 @@ export interface PerformanceItemRow extends PerformanceRow {
 // quantity column at all.
 export interface PurchaseRow {
   name: string
+  // The creditor's AccNo — see PerformanceRow.code. Absent on the Item
+  // breakdown for the same reason.
+  code?: string
   currency: string
   purchase: number
 }
@@ -134,11 +136,117 @@ export interface PurchaseItemRow extends PurchaseRow {
 }
 
 // The Purchase page's KPI tiles read the same get_kpi_summary_v2 response
-// as the Sales Dashboard; this is the subset of it they use.
+// as the Sales page; this is the subset of it they use.
 export interface PurchaseKpiSummary {
   currency: string
   total_purchase: number
   total_revenue: number
+}
+
+// --- Recent Sales / Recent Purchases -------------------------------------
+
+// One row per document, rather than per bucket — the un-collapsed form of
+// the same de-duplicated document set every aggregate above is summed from,
+// so a list's amounts and the KPI tiles always agree.
+//
+// `amount` is signed: a credit note / purchase return arrives negative,
+// which is what makes the rows add up to the totals shown elsewhere.
+export interface DocumentRow {
+  doc_no: string
+  // ISO datetime as stored (DocDate is a datetime, not a date) — render the
+  // date part only.
+  doc_date: string
+  // Human label, not an AutoCount table code: 'Invoice', 'Cash Sale',
+  // 'Credit Note', 'Purchase Invoice', … A document that exists only in the
+  // ledger (no stock twin) reads 'AR Invoice' / 'AP Invoice' instead.
+  doc_type: string
+  // Debtor on the sales side, creditor on the purchase side. Falls back to
+  // the raw account code, then to '(No Debtor)'/'(No Creditor)'.
+  party_name: string
+  party_code: string
+  // Sales side only — always '' for purchases, where sales agent isn't a
+  // concept. Empty on a credit note too: ARCN carries no SalesAgent.
+  agent: string
+  currency: string
+  amount: number
+}
+
+// One item line of a document, for the document detail overlay. Only stock
+// documents (IV/CS/DN/CN, PI/CP/PR) have these — a pure ledger document
+// carries account postings instead, and returns no lines at all.
+export interface DocumentLineRow {
+  seq: number
+  item_code: string
+  description: string
+  qty: number
+  uom: string
+  unit_price: number
+  amount: number
+  // From the document header (SalesLocation / PurchaseLocation), so every
+  // line of one document shares it — AutoCount doesn't vary it per line.
+  location: string
+  currency: string
+}
+
+// --- Debtor / Creditor pages ---------------------------------------------
+
+// Debtor and Creditor are the same shape in AutoCount down to the column
+// names, so one row type serves both pages. Almost every field is nullable:
+// these are optional fields on the master record, and a book that only fills
+// in a name and a credit limit is perfectly normal — render "not set" by
+// omitting the field, never by printing an empty string.
+export interface PartyCatalogRow {
+  acc_no: string
+  company_name: string
+  name2: string
+  // Debtor.DebtorType / Creditor.CreditorType.
+  party_type: string
+  register_no: string
+  address1: string
+  address2: string
+  address3: string
+  address4: string
+  post_code: string
+  phone1: string
+  phone2: string
+  mobile: string
+  fax1: string
+  email: string
+  website: string
+  attention: string
+  // Debtor.SalesAgent / Creditor.PurchaseAgent — the agent assigned to this
+  // party on the master record, not derived from any document.
+  agent: string
+  // Debtor.DisplayTerm, e.g. "C.O.D.", "30 Days".
+  credit_term: string
+  credit_limit: number
+  currency: string
+  is_active: boolean
+  // Summed from the invoice and debit-note ledgers. Credit notes and
+  // payments are already netted into those rows' own Outstanding column, so
+  // this is the live balance, not a gross total.
+  outstanding: number
+}
+
+// --- Sales Agent page ----------------------------------------------------
+
+// AutoCount has no sales-agent master table — SalesAgent is a plain column
+// on sales documents — so this row is entirely derived from activity. There
+// is no address, phone, or credit term to show, unlike PartyCatalogRow.
+export interface SalesAgentCatalogRow {
+  name: string
+  revenue: number
+  currency: string
+  document_count: number
+  // Distinct debtors this agent actually billed in the date range.
+  debtor_count: number
+  first_doc_date: string
+  last_doc_date: string
+  // Debtors whose master record names this agent (Debtor.SalesAgent).
+  // Independent of the date range, and can be 0 while revenue is not —
+  // an agent can sell to debtors who aren't formally assigned to them.
+  assigned_debtors: number
+  has_image: boolean
 }
 
 // --- Item page -----------------------------------------------------------

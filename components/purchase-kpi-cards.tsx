@@ -4,7 +4,7 @@ import { ShoppingCart, Wallet } from 'lucide-react'
 import KpiCard from '@/components/kpi-card'
 
 // Totals only, no cash/credit split. Total Revenue is included in its own
-// mint color (matching the Sales Dashboard's Total Revenue tile) so it reads
+// mint color (matching the Sales page's Total Revenue tile) so it reads
 // visually as "the comparison figure from the other domain," not a second
 // purchase metric.
 //

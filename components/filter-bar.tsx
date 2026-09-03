@@ -25,8 +25,8 @@ interface Props {
   // track and leaves a real gap instead of letting the next slot (Export)
   // fill it.
   trailing?: ReactNode[]
-  // Overrides the default from/to date pickers (e.g. Sales Dashboard's
-  // preset selector) when provided. Other pages keep the plain pickers.
+  // Overrides the default from/to date pickers (e.g. a page's preset
+  // selector) when provided. Other pages keep the plain pickers.
   datePicker?: ReactNode
   // Purchase has no Sales Agent concept and shows Creditor instead of
   // Debtor — these default to the original Sales/Monthly/Performance/Item
@@ -37,8 +37,8 @@ interface Props {
   showCreditor?: boolean
 }
 
-// Global FilterBar (PLAN.md Section 3) — shared by Sales Dashboard, Monthly
-// Sales, Performance, and Item pages. Date range + 3 entity fields (Item,
+// Global FilterBar (PLAN.md Section 3) — shared by the Monthly Sales
+// landing page and the Sales, Purchase, and Item pages. Date range + 3 entity fields (Item,
 // Sales Agent, Debtor) + Item Group/Item Type. Every field
 // except date range is a Combobox — click for the full list (same as a
 // plain <select>), or type to live-filter it by name. An entity field with

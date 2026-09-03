@@ -81,7 +81,7 @@ If a probe returns rows, the dashboard pages will work — they use the identica
 
 ```
 app/
-  (dashboard)/            main pages — overview, monthly, performance, purchase, item
+  (dashboard)/            main pages — overview, monthly, sales, purchase, item
   (dashboard)/test/       connection smoke test (see above)
   api/presoft/[name]/     server-side proxy to the reports service (data)
   api/presoft/items/…     binary passthrough for item images
@@ -106,5 +106,5 @@ types/index.ts            row shapes returned by presoft-api
 
 - `/api/test/credit-paid` and `/api/test/join-integrity` are dashboard-side hookups for `/api/v1/test/*` endpoints that **don't exist on the service**. Nothing calls them; they'll 404 until that side is built.
 - **Which accounts count as revenue/purchase is still provisional.** The service currently takes every account in the 5xxx range as revenue and 6xxx as purchase. That sweeps in contra accounts (`DISCOUNT ALLOWED` adds to revenue instead of reducing it) and misses credit notes posted outside those ranges. Pending a decision on an explicit account map.
-- The Location filter exists only on the Item page; it was removed from the shared filter bar and from the Performance/Purchase breakdowns.
+- The Location filter exists only on the Item page; it was removed from the shared filter bar and from the Sales/Purchase breakdowns.
 - No authentication, as above.

@@ -61,6 +61,130 @@ function groupBy(params: URLSearchParams): string {
   return raw === 'group' || raw === 'type' ? raw : 'item'
 }
 
+// Shared by both document lists — the two endpoints return the same columns,
+// with `agent` simply always empty on the purchase side.
+// The label the report uses for lines carrying no item at all. It's a
+// bucket, not an item code, so it never gets a drillable code.
+const NO_ITEM_LABEL = '(No Item)'
+
+function itemCode(bucketName: string, mode: string): string {
+  return mode === 'item' && bucketName !== NO_ITEM_LABEL ? bucketName : ''
+}
+
+function documentRows(rows: Row[]) {
+  return rows.map((r) => ({
+    doc_no: str(r.docNo),
+    doc_date: str(r.docDate),
+    doc_type: str(r.docType),
+    party_name: str(r.partyName),
+    party_code: str(r.partyCode),
+    agent: str(r.agent),
+    currency: REPORTING_CURRENCY,
+    amount: num(r.amount),
+  }))
+}
+
+// search/sort/limit for the master-data card lists. `withDates` adds the
+// shared date range on top, for the one catalog (sales agents) whose figures
+// are derived from documents rather than read off a master record.
+function catalogQuery(params: URLSearchParams, withDates = false): string {
+  const extra: Record<string, string> = {}
+  for (const key of ['search', 'sort'] as const) {
+    const value = params.get(key)
+    if (value) extra[key] = value
+  }
+  if (withDates) return reportQuery(params, extra)
+
+  // reportQuery would add fromDate/toDate, which the party catalogs don't
+  // take — build the string from limit + extras alone.
+  const qs = new URLSearchParams(extra)
+  const limit = params.get('limit')
+  if (limit) {
+    const n = Number(limit)
+    if (Number.isFinite(n) && n > 0 && n < NO_LIMIT_SENTINEL) qs.set('limit', String(n))
+  }
+  const s = qs.toString()
+  return s ? `?${s}` : ''
+}
+
+// AutoCount stores these flags as 'T'/'F' chars, not bits.
+function flag(value: unknown): boolean {
+  return String(value ?? '').toUpperCase() === 'T'
+}
+
+// Debtor and Creditor return the same columns, so one mapper serves both.
+// Null/empty stays as '' — the pages treat empty as "not set" and omit the
+// field rather than rendering a blank row.
+function partyCatalogRows(rows: Row[]) {
+  return rows.map((r) => ({
+    acc_no: str(r.accNo),
+    company_name: str(r.companyName),
+    name2: str(r.name2),
+    party_type: str(r.partyType),
+    register_no: str(r.registerNo),
+    address1: str(r.address1),
+    address2: str(r.address2),
+    address3: str(r.address3),
+    address4: str(r.address4),
+    post_code: str(r.postCode),
+    phone1: str(r.phone1),
+    phone2: str(r.phone2),
+    mobile: str(r.mobile),
+    fax1: str(r.fax1),
+    email: str(r.emailAddress),
+    website: str(r.webURL),
+    attention: str(r.attention),
+    agent: str(r.agent),
+    credit_term: str(r.creditTerm),
+    credit_limit: num(r.creditLimit),
+    currency: str(r.currencyCode) || REPORTING_CURRENCY,
+    is_active: flag(r.isActive),
+    outstanding: num(r.outstanding),
+  }))
+}
+
+// The dashboard's snake_case filter names mapped onto the service's
+// SalesFilter properties. Web API binds a complex type from the query string
+// under its parameter name, hence the "filter." prefix on every key.
+const SALES_FILTER_FIELDS: [string, string][] = [
+  ['agent', 'Agent'],
+  ['area', 'Area'],
+  ['location', 'Location'],
+  ['debtor', 'Debtor'],
+  ['debtor_type', 'DebtorType'],
+  ['item', 'Item'],
+  ['item_group', 'ItemGroup'],
+  ['item_type', 'ItemType'],
+  ['item_brand', 'ItemBrand'],
+  ['item_class', 'ItemClass'],
+  ['item_category', 'ItemCategory'],
+  ['project', 'Project'],
+  ['dept', 'Dept'],
+]
+
+// Date range + every supplied filter, preserving multi-select as repeated
+// query params rather than collapsing to one value.
+function salesFilterQuery(params: URLSearchParams): URLSearchParams {
+  const qs = new URLSearchParams()
+  const from = params.get('date_from')
+  const to = params.get('date_to')
+  if (from) qs.set('fromDate', from)
+  if (to) qs.set('toDate', to)
+
+  const limit = params.get('limit')
+  if (limit) {
+    const n = Number(limit)
+    if (Number.isFinite(n) && n > 0 && n < NO_LIMIT_SENTINEL) qs.set('limit', String(n))
+  }
+
+  for (const [incoming, property] of SALES_FILTER_FIELDS) {
+    for (const value of params.getAll(incoming)) {
+      if (value) qs.append(`filter.${property}`, value)
+    }
+  }
+  return qs
+}
+
 class ReportError extends Error {}
 
 async function getReport<T = Row[]>(path: string): Promise<T> {
@@ -95,28 +219,26 @@ const HANDLERS: Record<string, Handler> = {
       month: num(r.month),
       currency: REPORTING_CURRENCY,
       revenue: num(r.revenue),
+      purchase: num(r.purchase),
     }))
   },
 
   // The breakdown table and the trend chart show the same monthly figures.
   get_monthly_breakdown_v2: (params) => HANDLERS.get_monthly_trend_v2(params),
 
-  get_item_revenue_v2: async (params) => {
-    const rows = await getReport(`items${reportQuery(params, { groupBy: groupBy(params) })}`)
-    return rows.map((r) => ({
-      bucket_name: str(r.bucketName),
-      currency: REPORTING_CURRENCY,
-      qty: num(r.qty),
-      revenue: num(r.amount),
-    }))
-  },
-
-  get_item_best_sellers_v2: (params) => HANDLERS.get_item_revenue_v2(params),
-
+  // The Item breakdown. get_item_revenue_v2 / get_item_best_sellers_v2 used
+  // to sit here too, mapping the same `items` report onto a bucket_name/
+  // revenue shape for the old Sales Dashboard's chart and Best Sellers
+  // table; that page is gone and this handler serves the identical figures.
   get_performance_item_v2: async (params) => {
-    const rows = await getReport(`items${reportQuery(params, { groupBy: groupBy(params) })}`)
+    const mode = groupBy(params)
+    const rows = await getReport(`items${reportQuery(params, { groupBy: mode })}`)
     return rows.map((r) => ({
       name: str(r.bucketName),
+      // Only in Item mode is the bucket a single drillable item — a Group
+      // or Type bucket is a label over many, so it gets no code and the
+      // dashboard leaves its row unclickable.
+      code: itemCode(str(r.bucketName), mode),
       currency: REPORTING_CURRENCY,
       qty: num(r.qty),
       revenue: num(r.amount),
@@ -125,18 +247,33 @@ const HANDLERS: Record<string, Handler> = {
 
   get_performance_sales_agent_v2: async (params) => {
     const rows = await getReport(`agents${reportQuery(params)}`)
-    return rows.map((r) => ({ name: str(r.name), currency: REPORTING_CURRENCY, revenue: num(r.amount) }))
+    return rows.map((r) => ({
+      name: str(r.name),
+      code: str(r.code || r.name),
+      currency: REPORTING_CURRENCY,
+      revenue: num(r.amount),
+    }))
   },
 
   get_performance_debtor_v2: async (params) => {
     const rows = await getReport(`debtors${reportQuery(params)}`)
-    return rows.map((r) => ({ name: str(r.name), currency: REPORTING_CURRENCY, revenue: num(r.amount) }))
+    return rows.map((r) => ({
+      name: str(r.name),
+      // The AccNo behind the display name — what the detail overlay filters
+      // this debtor's documents by, since CompanyName isn't unique.
+      code: str(r.code),
+      currency: REPORTING_CURRENCY,
+      revenue: num(r.amount),
+    }))
   },
 
   get_purchase_item_v2: async (params) => {
-    const rows = await getReport(`purchase-items${reportQuery(params, { groupBy: groupBy(params) })}`)
+    const mode = groupBy(params)
+    const rows = await getReport(`purchase-items${reportQuery(params, { groupBy: mode })}`)
     return rows.map((r) => ({
       name: str(r.bucketName),
+      // See get_performance_item_v2 — only Item mode yields a drillable code.
+      code: itemCode(str(r.bucketName), mode),
       currency: REPORTING_CURRENCY,
       qty: num(r.qty),
       purchase: num(r.amount),
@@ -147,7 +284,131 @@ const HANDLERS: Record<string, Handler> = {
     const rows = await getReport(`creditors${reportQuery(params)}`)
     // No qty: creditor figures come off AP document headers, and the AP
     // ledger has no quantity column at all.
-    return rows.map((r) => ({ name: str(r.name), currency: REPORTING_CURRENCY, purchase: num(r.amount) }))
+    return rows.map((r) => ({
+      name: str(r.name),
+      code: str(r.code),
+      currency: REPORTING_CURRENCY,
+      purchase: num(r.amount),
+    }))
+  },
+
+  // Recent Sales / Recent Purchases: one row per document instead of per
+  // bucket. Both share a shape, so they share a mapper — `agent` is simply
+  // always empty on the purchase side.
+  get_recent_sales_v2: async (params) => {
+    const extra: Record<string, string> = {}
+    const agent = params.get('sales_agent')
+    const debtor = params.get('debtor')
+    const item = params.get('item')
+    if (agent) extra.agent = agent
+    if (debtor) extra.debtor = debtor
+    if (item) extra.item = item
+    return documentRows(await getReport(`sales-documents${reportQuery(params, extra)}`))
+  },
+
+  get_recent_purchases_v2: async (params) => {
+    const extra: Record<string, string> = {}
+    const creditor = params.get('creditor')
+    const item = params.get('item')
+    if (creditor) extra.creditor = creditor
+    if (item) extra.item = item
+    return documentRows(await getReport(`purchase-documents${reportQuery(params, extra)}`))
+  },
+
+  // Debtor / Creditor master-data card lists. Identical shapes — see
+  // partyCatalogRows — so the two differ only in which report they read.
+  get_debtor_catalog_v2: async (params) =>
+    partyCatalogRows(await getReport(`debtors-catalog${catalogQuery(params)}`)),
+
+  get_creditor_catalog_v2: async (params) =>
+    partyCatalogRows(await getReport(`creditors-catalog${catalogQuery(params)}`)),
+
+  // Sales agents. Unlike the two above this is date-ranged: with no master
+  // table behind it, every figure is derived from documents in the range.
+  get_sales_agent_catalog_v2: async (params) => {
+    const rows = await getReport(`sales-agents-catalog${catalogQuery(params, true)}`)
+    return rows.map((r) => ({
+      name: str(r.name),
+      revenue: num(r.revenue),
+      currency: REPORTING_CURRENCY,
+      document_count: num(r.documentCount),
+      debtor_count: num(r.debtorCount),
+      first_doc_date: str(r.firstDocDate),
+      last_doc_date: str(r.lastDocDate),
+      assigned_debtors: num(r.assignedDebtors),
+      has_image: num(r.hasImage) === 1 || r.hasImage === true,
+    }))
+  },
+
+  // The item lines of one document, for its detail overlay. `side` picks
+  // the sales or purchase family of stock tables — a DocNo alone doesn't
+  // say which it belongs to.
+  get_document_lines_v2: async (params) => {
+    const qs = new URLSearchParams({
+      docNo: params.get('doc_no') ?? '',
+      side: params.get('side') === 'purchase' ? 'purchase' : 'sales',
+    })
+    const rows = await getReport(`document-lines?${qs}`)
+    return rows.map((r) => ({
+      seq: num(r.seq),
+      item_code: str(r.itemCode),
+      description: str(r.description),
+      qty: num(r.qty),
+      uom: str(r.uom),
+      unit_price: num(r.unitPrice),
+      amount: num(r.amount),
+      location: str(r.location),
+      currency: REPORTING_CURRENCY,
+    }))
+  },
+
+  // --- Sales sub-pages (by agent / area / location) --------------------
+
+  // Sales grouped by one dimension, honouring the full multi-select filter
+  // set. `sales_by` picks the dimension.
+  get_sales_by_v2: async (params) => {
+    const qs = salesFilterQuery(params)
+    qs.set('by', params.get('sales_by') ?? 'agent')
+    const rows = await getReport(`sales-by?${qs}`)
+    return rows.map((r) => ({
+      name: str(r.name),
+      code: str(r.code),
+      currency: REPORTING_CURRENCY,
+      revenue: num(r.amount),
+      // Only the item dimensions return a quantity — document-level rows
+      // (agent/area/location) come from headers, which carry none, so this
+      // is 0 there rather than a figure that looks real.
+      qty: num(r.qty),
+    }))
+  },
+
+  get_sales_documents_filtered_v2: async (params) =>
+    documentRows(await getReport(`sales-documents-filtered?${salesFilterQuery(params)}`)),
+
+  get_sales_filter_options_v2: async () => {
+    const options = await getReport<Row>('sales-filter-options')
+    const list = (value: unknown) =>
+      (Array.isArray(value) ? (value as Row[]) : []).map((r) => ({
+        id: str(r.id),
+        // Codes are what the filters actually match on, so a description
+        // alone would leave the user guessing which "Main" they picked.
+        name: str(r.name) && str(r.name) !== str(r.id) ? `${str(r.id)} — ${str(r.name)}` : str(r.id),
+      }))
+    return [{
+      agents: list(options.agents),
+      areas: list(options.areas),
+      locations: list(options.locations),
+      debtors: list(options.debtors),
+      debtor_types: list(options.debtorTypes),
+      items: list(options.items),
+      item_groups: list(options.itemGroups),
+      item_types: list(options.itemTypes),
+      item_brands: list(options.itemBrands),
+      item_classes: list(options.itemClasses),
+      item_categories: list(options.itemCategories),
+      projects: list(options.projects),
+      depts: list(options.depts),
+    }]
   },
 
   get_filter_options_v2: async () => {
@@ -158,9 +419,9 @@ const HANDLERS: Record<string, Handler> = {
     const date = (value: unknown) => (value ? String(value).slice(0, 10) : null)
 
     return {
-      // The Location filter was removed from every page except Item, and
-      // the reports service doesn't return locations at all.
-      locations: [],
+      // Only the Item page still has a Location filter; every other page
+      // dropped the dimension.
+      locations: entities(options.locations),
       items: entities(options.items),
       sales_agents: entities(options.salesAgents),
       debtors: entities(options.debtors),
@@ -173,13 +434,55 @@ const HANDLERS: Record<string, Handler> = {
     }
   },
 
+  // One row per (item, location). The Item page groups them back into one
+  // card per item with a stock table underneath, so the per-item fields
+  // repeat across an item's rows — that's expected, not duplication.
   get_item_catalog_v2: async (params) => {
-    const options = await getReport<Row>('filter-options')
-    const search = params.get('search')?.trim().toLowerCase()
-    const items = Array.isArray(options.items) ? (options.items as Row[]) : []
-    return items
-      .filter((item) => !search || str(item.id).toLowerCase().includes(search))
-      .map((item) => ({ item_id: str(item.id), item_code: str(item.id), item_group: null, item_type: null }))
+    const qs = new URLSearchParams()
+    for (const [from, to] of [
+      ['search', 'search'],
+      ['item', 'item'],
+      ['item_group', 'itemGroup'],
+      ['item_type', 'itemType'],
+      ['location', 'location'],
+      ['sort', 'sort'],
+    ] as const) {
+      const value = params.get(from)
+      if (value) qs.set(to, value)
+    }
+    const limit = params.get('limit')
+    if (limit) {
+      const n = Number(limit)
+      if (Number.isFinite(n) && n > 0 && n < NO_LIMIT_SENTINEL) qs.set('limit', String(n))
+    }
+
+    const rows = await getReport(`items-catalog${qs.toString() ? `?${qs}` : ''}`)
+    // A price tier that is NULL in AutoCount stays null here rather than
+    // being coerced to 0, so the page can tell "not set" from "priced at 0"
+    // and hide the tier instead of showing a misleading zero.
+    const money = (v: unknown): number | null => (v == null ? null : num(v))
+
+    return rows.map((r) => ({
+      item_id: str(r.itemCode),
+      item_code: str(r.itemCode),
+      description: str(r.description),
+      item_group: r.itemGroup == null ? null : str(r.itemGroup),
+      item_type: r.itemType == null ? null : str(r.itemType),
+      costing_method: num(r.costingMethod),
+      has_image: num(r.hasImage) === 1,
+      location_name: r.locationName == null ? null : str(r.locationName),
+      qty_on_hand: num(r.qtyOnHand),
+      cost: num(r.cost),
+      unit_price: num(r.unitPrice),
+      price1: money(r.price1),
+      price2: money(r.price2),
+      price3: money(r.price3),
+      price4: money(r.price4),
+      price5: money(r.price5),
+      price6: money(r.price6),
+      min_price: money(r.minPrice),
+      max_price: money(r.maxPrice),
+    }))
   },
 }
 

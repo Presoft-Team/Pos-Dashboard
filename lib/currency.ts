@@ -116,28 +116,31 @@ export const CHART_PALETTE = ['#F2AA24', '#5B8DEF', '#00D697', '#E85D75', '#9B59
 export interface MonthlyTrendBreakdown {
   currency: string
   revenue: number
+  purchase: number
 }
 
 export interface MonthlyTrendPivotRow {
   name: string
-  // Magnitude only (summed across currencies, no FX conversion) — used for
+  // Magnitudes only (summed across currencies, no FX conversion) — used for
   // line height. Real per-currency numbers live in `breakdown`, for the
   // tooltip.
   total: number
+  totalPurchase: number
   breakdown: MonthlyTrendBreakdown[]
 }
 
 interface MonthlyRevenueRow {
   currency: string
   revenue: number
+  purchase: number
 }
 
-// Monthly revenue pivot, chronological (by year/month) rather than ranked by
-// magnitude — for the Monthly Sales trend chart, which needs its months in
-// order, not sorted by size.
+// Monthly revenue + purchase pivot, chronological (by year/month) rather
+// than ranked by magnitude — for the Monthly trend chart, which needs its
+// months in order, not sorted by size.
 //
-// The API only returns rows for months that actually had sales — a month
-// with $0 revenue is a missing row, not a zero row. Left as-is, that reads
+// The API only returns rows for months that had activity — a month with $0
+// on both sides is a missing row, not a zero row. Left as-is, that reads
 // on the chart as "no data available" rather than "nothing sold," and the
 // x-axis silently skips months. When dateFrom/dateTo are given, this fills
 // every month in that range with a zeroed entry before overlaying the real
@@ -151,9 +154,10 @@ export function pivotMonthlyTrend<T extends MonthlyRevenueRow & { year: number; 
   const byMonth = new Map<string, MonthlyTrendPivotRow>()
   for (const row of rows) {
     const key = `${row.year}-${row.month}`
-    const entry = byMonth.get(key) ?? { name: `${monthNames[row.month]} ${row.year}`, total: 0, breakdown: [] }
+    const entry = byMonth.get(key) ?? { name: `${monthNames[row.month]} ${row.year}`, total: 0, totalPurchase: 0, breakdown: [] }
     entry.total += row.revenue
-    entry.breakdown.push({ currency: row.currency, revenue: row.revenue })
+    entry.totalPurchase += row.purchase
+    entry.breakdown.push({ currency: row.currency, revenue: row.revenue, purchase: row.purchase })
     byMonth.set(key, entry)
   }
 
@@ -180,6 +184,6 @@ export function pivotMonthlyTrend<T extends MonthlyRevenueRow & { year: number; 
     const existing = byMonth.get(key)
     if (existing) return existing
     const [y, m] = key.split('-').map(Number)
-    return { name: `${monthNames[m]} ${y}`, total: 0, breakdown: [] }
+    return { name: `${monthNames[m]} ${y}`, total: 0, totalPurchase: 0, breakdown: [] }
   })
 }

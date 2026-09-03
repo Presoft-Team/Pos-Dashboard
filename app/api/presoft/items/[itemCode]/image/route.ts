@@ -1,4 +1,4 @@
-// Binary passthrough for presoft-api's GET /api/v1/items/:itemCode/image —
+// Binary passthrough for the reports service's item photo endpoint —
 // separate from app/api/presoft/[name]/route.ts because that one only ever
 // returns JSON (RPC_TO_PATH + a fixed shape); this streams raw image bytes
 // with whatever Content-Type presoft-api sniffed, and needs a dynamic path
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { itemCode } = await params
 
   const { res: apiRes, error } = await apiFetch(
-    `/api/v1/items/${encodeURIComponent(itemCode)}/image`
+    `/api/reports/items/${encodeURIComponent(itemCode)}/image`
   )
   if (error) return error
 

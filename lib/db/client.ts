@@ -10,7 +10,7 @@
 
 // presoft-api has no "unlimited" convention for `limit` (missing = its own
 // sensible default of 5, for public API callers who forget to set one) —
-// but this dashboard's Performance page relies on requesting genuinely all
+// but this dashboard's Sales page relies on requesting genuinely all
 // rows (`p_limit: null`) for its full breakdown tables, re-slicing to top-5
 // client-side for the chart from that same fetch (see
 // components/performance-table.tsx). Translate that intent into an
@@ -27,6 +27,18 @@ function toQueryString(params?: Record<string, unknown>): string {
   const usp = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
     const cleanKey = key.startsWith('p_') ? key.slice(2) : key
+
+    // Multi-select filters arrive as arrays and go out as repeated params
+    // (?agent=A&agent=B) rather than a joined string — a comma-separated
+    // list would split wrongly on any code that contains a comma.
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        if (entry === null || entry === undefined || entry === '') continue
+        usp.append(cleanKey, String(entry))
+      }
+      continue
+    }
+
     if (value === null || value === undefined || value === '') {
       if (cleanKey === 'limit') usp.set('limit', String(NO_LIMIT))
       continue

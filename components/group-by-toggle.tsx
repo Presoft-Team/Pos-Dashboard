@@ -9,7 +9,7 @@ const OPTIONS: { value: GroupByMode; label: string }[] = [
 ]
 
 // Individual Item / Item Group / Item Type toggle — shared by the Sales
-// Dashboard "Revenue by Item" chart+table and the Performance page's Item
+// Dashboard "Revenue by Item" chart+table and the Sales page's Item
 // dimension. See PLAN.md Sections 4 and 6.
 //
 // Always fills its container (every usage now sits in a grid/percentage

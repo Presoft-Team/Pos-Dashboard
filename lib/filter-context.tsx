@@ -17,8 +17,8 @@ interface FilterContextValue {
 
 const FilterContext = createContext<FilterContextValue | null>(null)
 
-// Shared filter state for every (dashboard) page — Sales Dashboard, Monthly
-// Sales, Performance, and Item all read/write the same `filters`/`groupBy`/
+// Shared filter state for every (dashboard) page — Monthly Sales (the
+// landing page), Sales, Purchase, and Item all read/write the same `filters`/`groupBy`/
 // `options` instead of each keeping its own, so switching pages keeps
 // whatever Item/Sales Agent/Debtor/date-range/currency was set
 // instead of resetting to defaults. Lives above <DashboardShell> in the
