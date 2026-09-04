@@ -32,14 +32,14 @@ const DEFAULT_SORT = 'date_desc'
 // sort menu reads in the same terms as the table it reorders.
 function documentSortOptions(middleLabel: string): SortOption[] {
   return [
-    { value: 'date_desc', label: 'Date (Newest → Oldest)' },
-    { value: 'date_asc', label: 'Date (Oldest → Newest)' },
-    { value: 'amount_desc', label: 'Amount (High → Low)' },
-    { value: 'amount_asc', label: 'Amount (Low → High)' },
-    { value: 'party_asc', label: `${middleLabel} (A → Z)` },
-    { value: 'party_desc', label: `${middleLabel} (Z → A)` },
-    { value: 'doc_no_asc', label: 'Doc No (A → Z)' },
-    { value: 'doc_no_desc', label: 'Doc No (Z → A)' },
+    { value: 'date_desc', label: 'Date desc' },
+    { value: 'date_asc', label: 'Date' },
+    { value: 'amount_desc', label: 'Amount desc' },
+    { value: 'amount_asc', label: 'Amount' },
+    { value: 'party_asc', label: middleLabel },
+    { value: 'party_desc', label: `${middleLabel} desc` },
+    { value: 'doc_no_asc', label: 'Doc No' },
+    { value: 'doc_no_desc', label: 'Doc No desc' },
   ]
 }
 
@@ -133,15 +133,17 @@ export default function DocumentTable({ title, rows, loading, partyLabel, middle
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-4 border-b border-gray-100">
         <h3 className="font-semibold text-gray-900 text-sm">{title}</h3>
         {!loading && rows.length > 0 && (
-          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:w-auto">
-            <Combobox
-              value={search}
-              options={searchOptions}
-              placeholder="All"
-              onChange={setSearch}
-              ariaLabel={`Search ${title}`}
-              fullWidth
-            />
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex-1 min-w-0 sm:w-48">
+              <Combobox
+                value={search}
+                options={searchOptions}
+                placeholder="All"
+                onChange={setSearch}
+                ariaLabel={`Search ${title}`}
+                fullWidth
+              />
+            </div>
             <SortSelect value={sort} options={sortOptions} onChange={setSort} />
           </div>
         )}

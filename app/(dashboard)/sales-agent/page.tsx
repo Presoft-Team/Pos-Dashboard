@@ -12,10 +12,10 @@ import SortSelect, { SortOption } from '@/components/sort-select'
 import EntityDetail, { EntityTarget } from '@/components/entity-detail'
 
 const SORT_OPTIONS: readonly SortOption[] = [
-  { value: 'revenue_desc', label: 'Revenue (High → Low)' },
-  { value: 'revenue_asc', label: 'Revenue (Low → High)' },
-  { value: 'documents_desc', label: 'Documents (High → Low)' },
-  { value: 'name', label: 'Name (A → Z)' },
+  { value: 'revenue_asc', label: 'Revenue' },
+  { value: 'revenue_desc', label: 'Revenue desc' },
+  { value: 'documents_desc', label: 'Documents desc' },
+  { value: 'name', label: 'Name' },
 ] as const
 
 const LIST_INITIAL_VISIBLE = 5
@@ -90,8 +90,8 @@ export default function SalesAgentPage() {
         <DatePresetFilter filters={filters} options={options} onChange={setFilters} />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-[6fr_4fr] gap-2">
-        <div className="relative min-w-0">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 min-w-0">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
@@ -101,9 +101,7 @@ export default function SalesAgentPage() {
             className="w-full h-9 pl-9 pr-3 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
           />
         </div>
-        <div className="min-w-0">
-          <SortSelect value={sort} options={SORT_OPTIONS} onChange={setSort} ariaLabel="Sort by" />
-        </div>
+        <SortSelect value={sort} options={SORT_OPTIONS} onChange={setSort} ariaLabel="Sort by" />
       </div>
 
       {loading ? (

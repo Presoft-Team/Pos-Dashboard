@@ -10,11 +10,11 @@ import SortSelect, { SortOption } from '@/components/sort-select'
 import EntityDetail, { EntityKind, EntityTarget } from '@/components/entity-detail'
 
 const SORT_OPTIONS: readonly SortOption[] = [
-  { value: 'code', label: 'Code (A → Z)' },
-  { value: 'name', label: 'Name (A → Z)' },
-  { value: 'outstanding_desc', label: 'Outstanding (High → Low)' },
-  { value: 'outstanding_asc', label: 'Outstanding (Low → High)' },
-  { value: 'credit_limit_desc', label: 'Credit Limit (High → Low)' },
+  { value: 'code', label: 'Code' },
+  { value: 'name', label: 'Name' },
+  { value: 'outstanding_asc', label: 'Outstanding' },
+  { value: 'outstanding_desc', label: 'Outstanding desc' },
+  { value: 'credit_limit_desc', label: 'Credit Limit desc' },
 ] as const
 
 const LIST_INITIAL_VISIBLE = 5
@@ -102,9 +102,9 @@ export default function PartyCatalog({ title, subtitle, rpc, agentLabel, kind }:
         <p className="text-sm text-gray-500">{search.trim() ? 'Search results' : subtitle}</p>
       </div>
 
-      {/* Search 60% / Sort 40%, stacking on mobile — same split as Item. */}
-      <div className="grid grid-cols-1 sm:grid-cols-[6fr_4fr] gap-2">
-        <div className="relative min-w-0">
+      {/* Search + sort icon, same row at every width. */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 min-w-0">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
@@ -114,9 +114,7 @@ export default function PartyCatalog({ title, subtitle, rpc, agentLabel, kind }:
             className="w-full h-9 pl-9 pr-3 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
           />
         </div>
-        <div className="min-w-0">
-          <SortSelect value={sort} options={SORT_OPTIONS} onChange={setSort} ariaLabel="Sort by" />
-        </div>
+        <SortSelect value={sort} options={SORT_OPTIONS} onChange={setSort} ariaLabel="Sort by" />
       </div>
 
       {loading ? (

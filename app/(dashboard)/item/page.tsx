@@ -73,11 +73,11 @@ const COSTING_METHOD_LABELS: Record<CostingMethod, string> = {
 }
 
 const SORT_OPTIONS = [
-  { value: 'item_code', label: 'Item Code (A–Z)' },
-  { value: 'cost_desc', label: 'Cost: High to Low' },
-  { value: 'cost_asc', label: 'Cost: Low to High' },
-  { value: 'price_desc', label: 'Unit Price: High to Low' },
-  { value: 'price_asc', label: 'Unit Price: Low to High' },
+  { value: 'item_code', label: 'Item Code' },
+  { value: 'cost_asc', label: 'Cost' },
+  { value: 'cost_desc', label: 'Cost desc' },
+  { value: 'price_asc', label: 'Unit Price' },
+  { value: 'price_desc', label: 'Unit Price desc' },
 ] as const
 
 const LOCATION_TABLE_INITIAL_VISIBLE = 5
@@ -289,11 +289,8 @@ export default function ItemPage() {
             className="w-full h-9 pl-9 pr-3 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
           />
         </div>
-        <div className="grid grid-cols-[3fr_2fr] gap-2">
-          <div className="min-w-0">
-            <SortSelect value={sort} options={SORT_OPTIONS} onChange={setSort} ariaLabel="Sort by" />
-          </div>
-          <div className="min-w-0">
+        <div className="flex gap-2">
+          <div className="flex-1 min-w-0">
             <Combobox
               value={filters.location}
               onChange={(v) => setFilters({ ...filters, location: v })}
@@ -303,6 +300,7 @@ export default function ItemPage() {
               fullWidth
             />
           </div>
+          <SortSelect value={sort} options={SORT_OPTIONS} onChange={setSort} ariaLabel="Sort by" />
         </div>
         <div className="flex gap-2">
           <div className="flex-1 min-w-0">
@@ -313,9 +311,8 @@ export default function ItemPage() {
       </div>
 
       <div className="hidden sm:flex sm:flex-col sm:gap-2">
-        {/* Search 60% / Sort 40% */}
-        <div className="grid grid-cols-[6fr_4fr] gap-2">
-          <div className="relative min-w-0">
+        <div className="flex gap-2">
+          <div className="relative flex-1 min-w-0">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
@@ -325,9 +322,7 @@ export default function ItemPage() {
               className="w-full h-9 pl-9 pr-3 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
             />
           </div>
-          <div className="min-w-0">
-            <SortSelect value={sort} options={SORT_OPTIONS} onChange={setSort} ariaLabel="Sort by" />
-          </div>
+          <SortSelect value={sort} options={SORT_OPTIONS} onChange={setSort} ariaLabel="Sort by" />
         </div>
         {/* Toggle 20% / Item-Group-Type combobox 40% / Location 40% — each
             grid child wrapped in min-w-0, otherwise a grid item's default

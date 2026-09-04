@@ -235,39 +235,23 @@ export default function SalesDimensionPage({
       {/* Best sellers — same filters, grouped by whichever item dimension
           the user picks. */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <h3 className="font-semibold text-gray-900 text-sm">
             Top {itemTopN} by {ITEM_DIMENSIONS.find((d) => d.key === itemDimension)?.label}
           </h3>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="flex rounded-lg border border-gray-200 bg-white p-0.5 gap-0.5 overflow-x-auto">
-              {ITEM_DIMENSIONS.map((d) => (
-                <button
-                  key={d.key}
-                  type="button"
-                  onClick={() => setItemDimension(d.key)}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
-                    itemDimension === d.key ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex rounded-lg border border-gray-200 bg-white p-0.5 gap-0.5 self-start">
-              {TOP_N_CHOICES.map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setItemTopN(n)}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                    itemTopN === n ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
+          <div className="flex rounded-lg border border-gray-200 bg-white p-0.5 gap-0.5 self-start">
+            {TOP_N_CHOICES.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setItemTopN(n)}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  itemTopN === n ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {n}
+              </button>
+            ))}
           </div>
         </div>
         {loading ? (
@@ -277,7 +261,28 @@ export default function SalesDimensionPage({
         ) : (
           <BarChartWidget data={itemChartData} showQty />
         )}
+        <div className="grid grid-cols-3 sm:flex sm:overflow-x-auto rounded-lg border border-gray-200 bg-white p-0.5 gap-0.5 mt-4">
+          {ITEM_DIMENSIONS.map((d) => (
+            <button
+              key={d.key}
+              type="button"
+              onClick={() => setItemDimension(d.key)}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
+                itemDimension === d.key ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
       </div>
+
+      <PerformanceTable
+        title={`${itemLabel} Breakdown`}
+        rows={itemRows}
+        loading={loading}
+        showQty
+      />
 
       <EntityDetail target={detail} onClose={() => setDetail(null)} filters={filters} />
 

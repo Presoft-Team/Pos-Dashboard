@@ -3,10 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PurchaseItemRow, PurchaseRow } from '@/types'
 import { formatMoney, formatQty } from '@/lib/currency'
-import {
-  applyBreakdown, breakdownSearchOptions, breakdownSortOptions, DEFAULT_BREAKDOWN_SORT,
-} from '@/lib/breakdown'
-import Combobox from '@/components/combobox'
+import { applyBreakdown, breakdownSortOptions, DEFAULT_BREAKDOWN_SORT } from '@/lib/breakdown'
 import SortSelect from '@/components/sort-select'
 
 interface Props {
@@ -36,18 +33,16 @@ const SHOW_MORE_STEP = 5
 // serve both isn't worth the indirection for 3 dimensions each).
 export default function PurchaseTable({ title, rows, loading, showQty = false, onRowClick }: Props) {
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
-  const [search, setSearch] = useState('')
   const [sort, setSort] = useState(DEFAULT_BREAKDOWN_SORT)
 
   // Reset expansion when the underlying rows change (new filters/data), and
-  // whenever the user narrows or reorders — a "show 5 more" position from
-  // the previous view means nothing against a different set of rows.
-  useEffect(() => { setVisibleCount(INITIAL_VISIBLE) }, [rows, search, sort])
+  // whenever the user reorders — a "show 5 more" position from the previous
+  // view means nothing against a different set of rows.
+  useEffect(() => { setVisibleCount(INITIAL_VISIBLE) }, [rows, sort])
 
-  const searchOptions = useMemo(() => breakdownSearchOptions(rows), [rows])
   const displayRows = useMemo(
-    () => applyBreakdown(rows, search, sort, (r) => r.purchase, qtyOf),
-    [rows, search, sort]
+    () => applyBreakdown(rows, sort, (r) => r.purchase, qtyOf),
+    [rows, sort]
   )
 
   const visibleRows = displayRows.slice(0, visibleCount)
@@ -56,22 +51,11 @@ export default function PurchaseTable({ title, rows, loading, showQty = false, o
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-4 border-b border-gray-100">
+      <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-100">
         <h3 className="font-semibold text-gray-900 text-sm">{title}</h3>
-        {/* Hidden while loading and when there's nothing to act on — an
-            enabled search over an empty table is just a dead control. */}
+        {/* Hidden while loading and when there's nothing to act on. */}
         {!loading && rows.length > 0 && (
-          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:w-auto">
-            <Combobox
-              value={search}
-              options={searchOptions}
-              placeholder="All"
-              onChange={setSearch}
-              ariaLabel={`Search ${title}`}
-              fullWidth
-            />
-            <SortSelect value={sort} options={breakdownSortOptions('Purchase', showQty)} onChange={setSort} />
-          </div>
+          <SortSelect value={sort} options={breakdownSortOptions('Purchase', showQty)} onChange={setSort} />
         )}
       </div>
 
@@ -80,9 +64,7 @@ export default function PurchaseTable({ title, rows, loading, showQty = false, o
           <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
         </div>
       ) : displayRows.length === 0 ? (
-        <div className="flex items-center justify-center h-40 text-gray-400 text-sm">
-          {rows.length === 0 ? 'No data found' : 'No rows match that search'}
-        </div>
+        <div className="flex items-center justify-center h-40 text-gray-400 text-sm">No data found</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

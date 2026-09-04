@@ -1,6 +1,6 @@
 import { SortOption } from '@/components/sort-select'
 
-// Shared search + sort behaviour for the breakdown tables. PerformanceTable
+// Shared sort behaviour for the breakdown tables. PerformanceTable
 // (revenue) and PurchaseTable (purchase) are structurally identical apart
 // from which amount field they read, so the logic lives here once and each
 // table passes its own key rather than duplicating it.
@@ -61,52 +61,29 @@ export function withoutUnattributed<T extends BreakdownRow>(rows: T[], show: boo
 // breakdowns read document headers, which carry no quantity.
 export function breakdownSortOptions(amountLabel: string, showQty: boolean): SortOption[] {
   return [
-    { value: 'amount_desc', label: `${amountLabel} (High → Low)` },
-    { value: 'amount_asc', label: `${amountLabel} (Low → High)` },
+    { value: 'amount_asc', label: amountLabel },
+    { value: 'amount_desc', label: `${amountLabel} desc` },
     ...(showQty
       ? [
-          { value: 'qty_desc', label: 'Qty (High → Low)' },
-          { value: 'qty_asc', label: 'Qty (Low → High)' },
+          { value: 'qty_asc', label: 'Qty' },
+          { value: 'qty_desc', label: 'Qty desc' },
         ]
       : []),
-    { value: 'name_asc', label: 'Name (A → Z)' },
-    { value: 'name_desc', label: 'Name (Z → A)' },
+    { value: 'name_asc', label: 'Name' },
+    { value: 'name_desc', label: 'Name desc' },
   ]
 }
 
-// Options for the search combobox: the names actually present in these rows,
-// so the list can never offer something that filters to nothing. Deduped —
-// a name appearing twice would otherwise give two identical rows with the
-// same id, which React keys and the combobox's own highlight both dislike.
-export function breakdownSearchOptions(rows: BreakdownRow[]) {
-  const seen = new Set<string>()
-  const options: { id: string; name: string }[] = []
-  for (const row of rows) {
-    if (!row.name || seen.has(row.name)) continue
-    seen.add(row.name)
-    options.push({ id: row.name, name: row.name })
-  }
-  return options.sort((a, b) => a.name.localeCompare(b.name))
-}
-
-// Filter then sort. `search` is a name — the combobox sets it to an exact
-// option, but a free-typed value that was never committed is matched as a
-// substring too, so typing without picking still narrows the table.
+// Sorts a breakdown's rows by the chosen option.
 export function applyBreakdown<T extends BreakdownRow>(
   rows: T[],
-  search: string,
   sort: string,
   amountOf: (row: T) => number,
   qtyOf: (row: T) => number = () => 0
 ): T[] {
-  const term = search.trim().toLowerCase()
-  const filtered = term
-    ? rows.filter((r) => r.name?.toLowerCase().includes(term))
-    : rows
-
   // Copy before sorting — the array belongs to the caller's state, and
   // sorting in place would mutate it.
-  const sorted = [...filtered]
+  const sorted = [...rows]
   switch (sort) {
     case 'amount_asc':
       sorted.sort((a, b) => amountOf(a) - amountOf(b))

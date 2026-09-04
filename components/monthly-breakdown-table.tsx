@@ -23,10 +23,10 @@ export function monthLabel(m: MonthlyRow): string {
 // alphabetising that would put April before January.
 function sortOptionsFor(label: string): SortOption[] {
   return [
-    { value: 'month_desc', label: 'Month (Newest → Oldest)' },
-    { value: 'month_asc', label: 'Month (Oldest → Newest)' },
-    { value: 'amount_desc', label: `${label} (High → Low)` },
-    { value: 'amount_asc', label: `${label} (Low → High)` },
+    { value: 'month_desc', label: 'Month desc' },
+    { value: 'month_asc', label: 'Month' },
+    { value: 'amount_desc', label: `${label} desc` },
+    { value: 'amount_asc', label },
   ]
 }
 
@@ -84,15 +84,17 @@ export default function MonthlyBreakdownTable({ title, rows, metric, label }: Pr
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-5 py-4 border-b border-gray-100">
         <h3 className="font-semibold text-gray-900 text-sm">{title}</h3>
-        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:w-auto">
-          <Combobox
-            value={search}
-            options={searchOptions}
-            placeholder="All months"
-            onChange={setSearch}
-            ariaLabel={`Search ${title}`}
-            fullWidth
-          />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex-1 min-w-0 sm:w-48">
+            <Combobox
+              value={search}
+              options={searchOptions}
+              placeholder="All months"
+              onChange={setSearch}
+              ariaLabel={`Search ${title}`}
+              fullWidth
+            />
+          </div>
           <SortSelect value={sort} options={sortOptions} onChange={setSort} />
         </div>
       </div>
