@@ -15,6 +15,7 @@ import SalesFilterPanel, {
 import BarChartWidget from '@/components/bar-chart'
 import PerformanceTable from '@/components/performance-table'
 import EntityDetail, { EntityKind, EntityTarget } from '@/components/entity-detail'
+import ItemDetail from '@/components/item-detail'
 import ExportModal, { ExportChartSpec, ExportTableSpec } from '@/components/export-modal'
 import { Download } from 'lucide-react'
 
@@ -72,6 +73,13 @@ export default function SalesDimensionPage({
   const [loading, setLoading] = useState(true)
   const [exportOpen, setExportOpen] = useState(false)
   const [detail, setDetail] = useState<EntityTarget | null>(null)
+  const [detailItem, setDetailItem] = useState<string | null>(null)
+  // Two distinct buckets — (No Agent)/(No Area)/(No Location) on the main
+  // breakdown, (No Item)/(No Item Group)/etc on the best-sellers side —
+  // toggled independently. Both hidden by default: each routinely dwarfs
+  // every real row. Tucked into the Filters panel rather than their own row.
+  const [showUnattributed, setShowUnattributed] = useState(false)
+  const [showItemUnattributed, setShowItemUnattributed] = useState(false)
 
   // Option lists are master data — fetched once, not per filter change.
   useEffect(() => {
@@ -110,20 +118,18 @@ export default function SalesDimensionPage({
     if (byRes.error) console.error('get_sales_by_v2 error:', byRes.error.message)
     if (itemRes.error) console.error(`get_sales_by_v2 (${itemDimension}) error:`, itemRes.error.message)
 
-    // The unattributed bucket — (No Agent) / (No Area) / (No Location) — is
-    // dropped outright on these pages. It isn't an agent, area or location,
-    // it can't be drilled into, and it routinely dwarfs every real row.
-    //
-    // Consequence worth knowing: the rows here therefore do NOT sum to total
-    // revenue. The documents list below is left whole, so it can contain
-    // documents that no row above accounts for.
-    setRows(withoutUnattributed((byRes.data as PerformanceRow[]) ?? [], false))
-    setItemRows(withoutUnattributed((itemRes.data as PerformanceItemRow[]) ?? [], false))
+    setRows((byRes.data as PerformanceRow[]) ?? [])
+    setItemRows((itemRes.data as PerformanceItemRow[]) ?? [])
     setLoading(false)
   }
 
+  // Filtered here rather than in fetchData so switching either checkbox
+  // doesn't need a re-fetch.
+  const visibleRows = withoutUnattributed(rows, showUnattributed)
+  const visibleItemRows = withoutUnattributed(itemRows, showItemUnattributed)
+
   const chartData = pivotRevenueByCurrency(
-    rows.map((r) => ({ ...r, total_revenue: r.revenue, total_qty: 0 })),
+    visibleRows.map((r) => ({ ...r, total_revenue: r.revenue, total_qty: 0 })),
     (r) => r.name,
     topN
   )
@@ -131,7 +137,7 @@ export default function SalesDimensionPage({
   // Item lines do carry a quantity, unlike the document-level rows above —
   // so this chart's tooltip can show Qty honestly.
   const itemChartData = pivotRevenueByCurrency(
-    itemRows.map((r) => ({ ...r, total_revenue: r.revenue, total_qty: r.qty ?? 0 })),
+    visibleItemRows.map((r) => ({ ...r, total_revenue: r.revenue, total_qty: r.qty ?? 0 })),
     (r) => r.name,
     itemTopN
   )
@@ -139,6 +145,10 @@ export default function SalesDimensionPage({
   const primaryOptions: EntityOption[] = filterOptions[optionsKey]
 
   const itemLabel = ITEM_DIMENSIONS.find((d) => d.key === itemDimension)?.label ?? 'Item'
+  // The bucket's real name — "Item Group"/"Item Type"/etc, matching
+  // lib/breakdown.ts's UNATTRIBUTED_LABELS — not the toggle's shorter
+  // "Group"/"Type" label.
+  const itemBucketLabel = itemDimension === 'item' ? 'Item' : `Item ${itemLabel}`
 
   // Mirrors the page: the two charts, then the breakdown and the best-seller
   // figures behind the second chart.
@@ -151,13 +161,13 @@ export default function SalesDimensionPage({
       id: 'breakdown',
       label: `${label} Breakdown`,
       columns: entityRevenueOnlyColumns('name', label),
-      rows: rows as unknown as Record<string, unknown>[],
+      rows: visibleRows as unknown as Record<string, unknown>[],
     },
     {
       id: 'item-breakdown',
       label: `${itemLabel} Breakdown`,
       columns: entityRevenueColumns('name', itemLabel),
-      rows: itemRows as unknown as Record<string, unknown>[],
+      rows: visibleItemRows as unknown as Record<string, unknown>[],
     },
   ]
 
@@ -180,7 +190,16 @@ export default function SalesDimensionPage({
               ariaLabel={label}
             />
           </div>
-          <SalesFilterPanel value={extra} onChange={setExtra} options={filterOptions} exclude={dimension} />
+          <SalesFilterPanel
+            value={extra}
+            onChange={setExtra}
+            options={filterOptions}
+            exclude={dimension}
+            unattributed={[
+              { checked: showUnattributed, onChange: setShowUnattributed, label: `(No ${label})` },
+              { checked: showItemUnattributed, onChange: setShowItemUnattributed, label: `(No ${itemBucketLabel})` },
+            ]}
+          />
           <button
             onClick={() => setExportOpen(true)}
             className="h-9 flex items-center justify-center gap-1.5 px-3 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors whitespace-nowrap w-full sm:w-auto shrink-0"
@@ -223,7 +242,7 @@ export default function SalesDimensionPage({
       {/* Breakdown */}
       <PerformanceTable
         title={`${label} Breakdown`}
-        rows={rows}
+        rows={visibleRows}
         loading={loading}
         onRowClick={
           detailKind
@@ -279,12 +298,17 @@ export default function SalesDimensionPage({
 
       <PerformanceTable
         title={`${itemLabel} Breakdown`}
-        rows={itemRows}
+        rows={visibleItemRows}
         loading={loading}
         showQty
+        // Only the Item dimension has a real item code to drill into — a
+        // Group/Type/Brand/Class/Category bucket has none, same rule
+        // PerformanceTable already applies via row.code.
+        onRowClick={itemDimension === 'item' ? (row) => setDetailItem(row.name) : undefined}
       />
 
       <EntityDetail target={detail} onClose={() => setDetail(null)} filters={filters} />
+      <ItemDetail itemCode={detailItem} onClose={() => setDetailItem(null)} filters={filters} history="sales" />
 
       <ExportModal
         open={exportOpen}

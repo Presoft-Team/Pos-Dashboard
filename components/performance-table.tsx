@@ -53,7 +53,7 @@ export default function PerformanceTable({ title, rows, loading, showQty = false
         <h3 className="font-semibold text-gray-900 text-sm">{title}</h3>
         {/* Hidden while loading and when there's nothing to act on. */}
         {!loading && rows.length > 0 && (
-          <SortSelect value={sort} options={breakdownSortOptions('Revenue', showQty)} onChange={setSort} />
+          <SortSelect value={sort} options={breakdownSortOptions('Sales', showQty)} onChange={setSort} />
         )}
       </div>
 
@@ -71,7 +71,7 @@ export default function PerformanceTable({ title, rows, loading, showQty = false
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide w-8">#</th>
                 <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Name</th>
                 {showQty && <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Qty</th>}
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Revenue</th>
+                <th className="px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide text-right">Sales</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">

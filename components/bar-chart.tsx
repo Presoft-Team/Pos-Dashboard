@@ -36,6 +36,14 @@ interface Props {
   showQty?: boolean
 }
 
+// Below this many bars, the chart stays fully responsive (100% width,
+// bars squeeze to fit) — that's readable enough and fills the card. Past
+// it, squeezing further makes bars too thin to read, so the chart instead
+// holds a fixed per-bar width and the card scrolls horizontally, same as a
+// wide table would.
+const SCROLL_THRESHOLD = 10
+const MIN_BAR_WIDTH = 56
+
 // One bar per entity — its height is a cross-currency sum (a magnitude only,
 // never a real total). Hover/tap the bar to see each currency's actual
 // revenue (and, where the dimension has one, quantity) broken out
@@ -56,24 +64,29 @@ export default function BarChartWidget({ data, color = '#F2AA24', showQty = fals
   const rows = chooseRows(names, width)
   const slotWidth = width && data.length ? (width / data.length) * rows * 0.9 : 0
 
+  const scrollable = data.length > SCROLL_THRESHOLD
+  const minWidth = scrollable ? data.length * MIN_BAR_WIDTH : undefined
+
   return (
-    <div ref={containerRef}>
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={data} margin={{ top: 4, right: 16, left: 8, bottom: 4 + (rows - 1) * 14 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-          <XAxis
-            dataKey="name"
-            interval={0}
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            tick={(props: any) => <StaggeredTick {...props} rows={rows} slotWidth={slotWidth} />}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis tickFormatter={formatK} tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={52} />
-          <Tooltip content={<CustomTooltip showQty={showQty} />} cursor={{ fill: '#f8fafc' }} />
-          <Bar dataKey="total" fill={color} radius={[4, 4, 0, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
+    <div className={scrollable ? 'overflow-x-auto' : undefined}>
+      <div ref={containerRef} style={minWidth ? { minWidth } : undefined}>
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={data} margin={{ top: 4, right: 16, left: 8, bottom: 4 + (rows - 1) * 14 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis
+              dataKey="name"
+              interval={0}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              tick={(props: any) => <StaggeredTick {...props} rows={rows} slotWidth={slotWidth} />}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis tickFormatter={formatK} tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={52} />
+            <Tooltip content={<CustomTooltip showQty={showQty} />} cursor={{ fill: '#f8fafc' }} />
+            <Bar dataKey="total" fill={color} radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   )
 }

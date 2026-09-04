@@ -411,6 +411,71 @@ const HANDLERS: Record<string, Handler> = {
     }]
   },
 
+  // Line-level rows behind the Multi Dimension Sales Analysis panel — one
+  // row per document line, carrying every dimension the panel's Columns tab
+  // can show. `doc_types` arrives as repeated params (one per checked
+  // Document Option); the report endpoint takes a single comma-joined list.
+  get_sales_analysis_v2: async (params) => {
+    const qs = new URLSearchParams()
+    const from = params.get('date_from')
+    const to = params.get('date_to')
+    if (from) qs.set('fromDate', from)
+    if (to) qs.set('toDate', to)
+
+    const limit = params.get('limit')
+    if (limit) {
+      const n = Number(limit)
+      if (Number.isFinite(n) && n > 0 && n < NO_LIMIT_SENTINEL) qs.set('limit', String(n))
+    }
+
+    const docTypes = params.getAll('doc_types')
+    if (docTypes.length > 0) qs.set('docTypes', docTypes.join(','))
+
+    const rows = await getReport(`sales-analysis?${qs}`)
+    return rows.map((r) => ({
+      doc_no: str(r.docNo),
+      doc_date: str(r.docDate),
+      doc_type: str(r.docType),
+      debtor_code: str(r.debtorCode),
+      company_name: str(r.companyName),
+      debtor_sales_agent: str(r.debtorSalesAgent),
+      debtor_type: str(r.debtorType),
+      area_code: str(r.areaCode),
+      branch_code: str(r.branchCode),
+      branch_name: str(r.branchName),
+      item_code: str(r.itemCode),
+      item_description: str(r.itemDescription),
+      item_description_2: str(r.itemDescription2),
+      item_group: str(r.itemGroup),
+      item_type: str(r.itemType),
+      item_brand: str(r.itemBrand),
+      item_class: str(r.itemClass),
+      item_category: str(r.itemCategory),
+      item_location: str(r.itemLocation),
+      item_batch_no: str(r.itemBatchNo),
+      serial_no: str(r.serialNoList),
+      uom: str(r.uom),
+      project: str(r.projNo),
+      department: str(r.deptNo),
+      acc_no: str(r.accNo),
+      ship_via: str(r.shipVia),
+      shipping_info: str(r.shippingInfo),
+      main_supplier: str(r.mainSupplier),
+      main_supplier_desc: str(r.mainSupplierDesc),
+      qty: num(r.qty),
+      smallest_qty: num(r.smallestQty),
+      foc_qty: num(r.focQty),
+      unit_price: num(r.unitPrice),
+      discount: str(r.discount),
+      sub_total: num(r.subTotal),
+      local_sub_total: num(r.localSubTotal),
+      local_total_cost: num(r.localTotalCost),
+      local_profit: num(r.localProfit),
+      profit_margin: num(r.profitMargin),
+      currency: REPORTING_CURRENCY,
+    }))
+  },
+
   get_filter_options_v2: async () => {
     const options = await getReport<Row>('filter-options')
     const entities = (value: unknown) =>

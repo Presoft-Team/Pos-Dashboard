@@ -17,7 +17,7 @@ export default function KpiCards({ data }: { data: KpiSummary[] }) {
 
   return (
     <div className="grid grid-cols-2 gap-4">
-      <KpiCard label="Total Revenue" value={total} sub="AR invoices + debit notes, net of credit notes and refunds" icon={Wallet} color="bg-mint/10 text-mint" />
+      <KpiCard label="Total Sales" value={total} sub="AR invoices + debit notes, net of credit notes and refunds" icon={Wallet} color="bg-mint/10 text-mint" />
       <KpiCard label="Credit Notes" value={creditNotes} sub="Already deducted above" icon={ReceiptText} color="bg-sand/20 text-ink" />
     </div>
   )

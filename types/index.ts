@@ -105,42 +105,54 @@ export interface PerformanceItemRow extends PerformanceRow {
   qty: number
 }
 
-// --- Purchase page ---------------------------------------------------
+// --- Multi Dimension Sales Analysis ---------------------------------------
 
-// Purchase-side twin of PerformanceRow — Item/Group/Type and Creditor
-// (instead of Debtor), no Sales Agent (not a purchase-side concept).
-// Named credit_purchase/cash_purchase, not credit_revenue/cash_revenue —
-// this is purchase spend, not revenue.
-//
-// Still the pre-migration shape: the Purchase page has not been moved onto
-// the company API yet, so nothing serves these rows today (see the purchase
-// RPCs missing from app/api/presoft/[name]/route.ts). Wiring it up means
-// aggregating APInvoice + APDebitNote - APCreditNote, mirroring the AR side
-// in lib/presoft-aggregate.ts.
-// Creditor breakdown. `purchase` rather than `revenue` — this is spend, not
-// income. No qty: it reads AP document headers, and the AP ledger has no
-// quantity column at all.
-export interface PurchaseRow {
-  name: string
-  // The creditor's AccNo — see PerformanceRow.code. Absent on the Item
-  // breakdown for the same reason.
-  code?: string
-  currency: string
-  purchase: number
-}
-
-// The Item breakdown is the one Purchase dimension sourced from stock lines
-// (PIDTL/CPDTL/PRDTL) rather than AP headers, so it alone reports a qty.
-export interface PurchaseItemRow extends PurchaseRow {
+// One row per sales document line, carrying every dimension the analysis
+// panel's Columns tab can show — a flat line browser (get_sales_analysis_v2),
+// not an aggregate, so the dashboard can group/pivot by whichever fields the
+// user drags in. Deliberately not de-duplicated against the AR ledger like
+// the breakdown aggregates are; a document with 3 lines appears 3 times.
+export interface SalesAnalysisRow {
+  doc_no: string
+  doc_date: string
+  doc_type: string
+  debtor_code: string
+  company_name: string
+  debtor_sales_agent: string
+  debtor_type: string
+  area_code: string
+  branch_code: string
+  branch_name: string
+  item_code: string
+  item_description: string
+  item_description_2: string
+  item_group: string
+  item_type: string
+  item_brand: string
+  item_class: string
+  item_category: string
+  item_location: string
+  item_batch_no: string
+  serial_no: string
+  uom: string
+  project: string
+  department: string
+  acc_no: string
+  ship_via: string
+  shipping_info: string
+  main_supplier: string
+  main_supplier_desc: string
   qty: number
-}
-
-// The Purchase page's KPI tiles read the same get_kpi_summary_v2 response
-// as the Sales page; this is the subset of it they use.
-export interface PurchaseKpiSummary {
+  smallest_qty: number
+  foc_qty: number
+  unit_price: number
+  discount: string
+  sub_total: number
+  local_sub_total: number
+  local_total_cost: number
+  local_profit: number
+  profit_margin: number
   currency: string
-  total_purchase: number
-  total_revenue: number
 }
 
 // --- Recent Sales / Recent Purchases -------------------------------------

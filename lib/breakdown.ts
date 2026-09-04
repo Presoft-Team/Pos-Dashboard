@@ -1,9 +1,6 @@
 import { SortOption } from '@/components/sort-select'
 
-// Shared sort behaviour for the breakdown tables. PerformanceTable
-// (revenue) and PurchaseTable (purchase) are structurally identical apart
-// from which amount field they read, so the logic lives here once and each
-// table passes its own key rather than duplicating it.
+// Shared sort behaviour for PerformanceTable's breakdown rows.
 
 // Only `name` is required. The amount and qty are read through accessors
 // the caller supplies rather than by string key, so the real row types

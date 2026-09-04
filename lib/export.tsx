@@ -69,16 +69,7 @@ export function entityRevenueColumns(nameKey: string, nameLabel: string): Export
   return [
     { key: nameKey, label: nameLabel },
     { key: 'qty', label: 'Qty', align: 'right', formatForPdf: (r) => fmtInt(r.qty) },
-    money('revenue', 'Revenue'),
-  ]
-}
-
-// Purchase twin of entityRevenueOnlyColumns — for the Creditor breakdown,
-// whose rows come from AP document headers and so carry no quantity.
-export function entityPurchaseOnlyColumns(nameKey: string, nameLabel: string): ExportColumn[] {
-  return [
-    { key: nameKey, label: nameLabel },
-    money('purchase', 'Purchase'),
+    money('revenue', 'Sales'),
   ]
 }
 
@@ -87,17 +78,7 @@ export function entityPurchaseOnlyColumns(nameKey: string, nameLabel: string): E
 export function entityRevenueOnlyColumns(nameKey: string, nameLabel: string): ExportColumn[] {
   return [
     { key: nameKey, label: nameLabel },
-    money('revenue', 'Revenue'),
-  ]
-}
-
-// Purchase-side twin of entityRevenueColumns — credit_purchase/cash_purchase,
-// not credit_revenue/cash_revenue (this is spend, not revenue).
-export function entityPurchaseColumns(nameKey: string, nameLabel: string): ExportColumn[] {
-  return [
-    { key: nameKey, label: nameLabel },
-    { key: 'qty', label: 'Qty', align: 'right', formatForPdf: (r) => fmtInt(r.qty) },
-    money('purchase', 'Purchase'),
+    money('revenue', 'Sales'),
   ]
 }
 

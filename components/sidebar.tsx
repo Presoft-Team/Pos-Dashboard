@@ -5,11 +5,10 @@ import { usePathname } from 'next/navigation'
 import {
   CalendarDays,
   BarChart3,
-  Truck,
   Tag,
-  Users,
-  Building2,
   UserRound,
+  MapPin,
+  Building2,
   X,
 } from 'lucide-react'
 
@@ -17,17 +16,14 @@ const NAV = [
   // Monthly is the landing page now — the old Sales Dashboard at '/' was
   // removed, its KPI tiles moved to the Sales page, and its Revenue-by-Item
   // chart/table dropped as duplicates of Sales' own Item breakdown.
-  { href: '/',            label: 'Monthly',     icon: CalendarDays },
-  { href: '/sales',       label: 'Sales',       icon: BarChart3 },
-  // First of the three Sales sub-pages — Area and Location follow once
-  // this one's shape is confirmed.
-  { href: '/sales/agent', label: 'Sales by Agent', icon: UserRound },
-  { href: '/purchase',    label: 'Purchase',    icon: Truck },
+  { href: '/',              label: 'Monthly',     icon: CalendarDays },
+  { href: '/sales',         label: 'Sales',       icon: BarChart3 },
+  // The three Sales sub-pages.
+  { href: '/sales/agent',    label: 'Sales by Agent',    icon: UserRound },
+  { href: '/sales/area',     label: 'Sales by Area',     icon: MapPin },
+  { href: '/sales/location', label: 'Sales by Location', icon: Building2 },
   // Master-data browsers, grouped after the reporting pages.
-  { href: '/item',        label: 'Item',        icon: Tag },
-  { href: '/debtor',      label: 'Debtor',      icon: Users },
-  { href: '/creditor',    label: 'Creditor',    icon: Building2 },
-  { href: '/sales-agent', label: 'Sales Agent', icon: UserRound },
+  { href: '/item',          label: 'Item',        icon: Tag },
 ]
 
 interface Props {
@@ -78,13 +74,10 @@ export default function Sidebar({ mobileOpen, onClose }: Props) {
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {NAV.map(({ href, label, icon: Icon }) => {
-            // Exact match, or a real path segment below it — a plain
-            // startsWith() would light up "Sales" while on "/sales-agent",
-            // since one href is a string prefix of the other.
-            const active =
-              href === '/'
-                ? pathname === '/'
-                : pathname === href || pathname.startsWith(`${href}/`)
+            // Exact match only — Sales has its own child route
+            // ('/sales/agent') with its own nav entry, so a prefix match
+            // would light up both rows at once while on it.
+            const active = pathname === href
             return (
               <Link
                 key={href}

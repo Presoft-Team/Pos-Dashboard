@@ -9,6 +9,7 @@ import { withoutUnattributed } from '@/lib/breakdown'
 import DetailOverlay from '@/components/detail-overlay'
 import DocumentTable from '@/components/document-table'
 import DocumentDetail, { DocumentTarget } from '@/components/document-detail'
+import ItemDetail from '@/components/item-detail'
 import PerformanceTable from '@/components/performance-table'
 
 // Which kind of thing is open. Drives both the RPCs used and what the body
@@ -92,6 +93,7 @@ export default function EntityDetail({ target, onClose, filters }: Props) {
   const [documents, setDocuments] = useState<DocumentRow[]>([])
   const [loading, setLoading] = useState(true)
   const [docDetail, setDocDetail] = useState<DocumentTarget | null>(null)
+  const [detailItem, setDetailItem] = useState<string | null>(null)
 
   // Agent item breakdown state — only populated when isAgent.
   const [itemDimension, setItemDimension] = useState<ItemDimension>('item')
@@ -225,7 +227,7 @@ export default function EntityDetail({ target, onClose, filters }: Props) {
                 )}
                 <div className="min-w-0 grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 flex-1">
                   <div>
-                    <p className="text-xs text-gray-400">Revenue</p>
+                    <p className="text-xs text-gray-400">Sales</p>
                     <p className="text-sm font-semibold text-gray-900">{formatMoney(total, currency)}</p>
                   </div>
                   <div>
@@ -256,7 +258,7 @@ export default function EntityDetail({ target, onClose, filters }: Props) {
           {/* Party (Debtor/Creditor) Headline figures */}
           {!isAgent && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <Stat label={isDebtor ? 'Revenue' : 'Purchase'} value={formatMoney(total, currency)} />
+              <Stat label={isDebtor ? 'Sales' : 'Purchase'} value={formatMoney(total, currency)} />
               <Stat label="Documents" value={formatQty(documents.length)} />
               {party && <Stat label="Outstanding" value={formatMoney(party.outstanding, party.currency)} />}
             </div>
@@ -325,6 +327,7 @@ export default function EntityDetail({ target, onClose, filters }: Props) {
                 rows={itemRows}
                 loading={itemLoading}
                 showQty
+                onRowClick={itemDimension === 'item' ? (row) => setDetailItem(row.name) : undefined}
               />
             </div>
           )}
@@ -344,6 +347,7 @@ export default function EntityDetail({ target, onClose, filters }: Props) {
           />
 
           <DocumentDetail target={docDetail} onClose={() => setDocDetail(null)} layer="above" />
+          <ItemDetail itemCode={detailItem} onClose={() => setDetailItem(null)} filters={filters} history="sales" layer="above" />
         </>
       )}
     </DetailOverlay>

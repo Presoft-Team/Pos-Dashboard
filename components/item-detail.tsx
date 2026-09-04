@@ -44,12 +44,18 @@ interface Props {
   // Which history to show. The Sales page opens an item's sales documents,
   // Purchase opens its purchases; the Item page shows both.
   history?: 'sales' | 'purchase' | 'both'
+  // 'above' when opened from inside another overlay (e.g. an agent's own
+  // item breakdown in EntityDetail) — stacks over it instead of racing it
+  // for the same layer. Its own nested DocumentDetail stays 'above' too;
+  // reusing the one higher tier is enough since DOM order still paints the
+  // later-opened overlay on top.
+  layer?: 'base' | 'above'
 }
 
 // The full item record plus the documents it appears on. Opened from the
 // Item page's cards and from the Item breakdown rows on Sales/Purchase, so
 // it fetches by code rather than taking a preloaded row.
-export default function ItemDetail({ itemCode, onClose, filters, history = 'both' }: Props) {
+export default function ItemDetail({ itemCode, onClose, filters, history = 'both', layer = 'base' }: Props) {
   const supabase = createClient()
 
   const [rows, setRows] = useState<ItemCatalogRow[]>([])
@@ -118,6 +124,7 @@ export default function ItemDetail({ itemCode, onClose, filters, history = 'both
     <DetailOverlay
       open
       onClose={onClose}
+      layer={layer}
       title={itemCode}
       subtitle={
         item
