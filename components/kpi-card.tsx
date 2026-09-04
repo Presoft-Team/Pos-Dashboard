@@ -1,4 +1,4 @@
-// Single stat tile — shared by KpiCards (Sales Dashboard) and
+// Single stat tile — shared by KpiCards (Sales page) and
 // PurchaseKpiCards (Purchase page). Pulled out once a second page needed
 // the identical tile, rather than duplicating the markup.
 export interface KpiCardProps {

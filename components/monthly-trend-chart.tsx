@@ -2,40 +2,62 @@
 
 import { useEffect, useRef, useState } from 'react'
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
-import { formatMoney, CASH_CREDIT_COLORS, CashCreditPivotRow } from '@/lib/currency'
+import { formatMoney, MonthlyTrendPivotRow } from '@/lib/currency'
 import { chooseRows, StaggeredTick, formatK } from '@/components/chart-axis-tick'
 
-const TOTAL_COLOR = '#111827'
+const SALES_COLOR = '#F97316'   // Orange for Sales
+const PURCHASE_COLOR = '#111827' // Black for Purchase
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({ active, payload, label, series }: any) {
   if (!active || !payload?.length) return null
-  const row: CashCreditPivotRow | undefined = payload[0]?.payload
+  const row: MonthlyTrendPivotRow | undefined = payload[0]?.payload
   if (!row) return null
+  // The tooltip lists only the lines actually drawn — naming a series the
+  // reader can't see on the chart is just noise.
+  const showSales = series !== 'purchase'
+  const showPurchase = series !== 'sales'
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm space-y-2">
       <p className="font-semibold text-gray-900">{label}</p>
-      {row.breakdown.map((b) => (
-        <div key={b.currency}>
-          <p className="text-xs font-semibold text-gray-500">{b.currency}</p>
-          <p style={{ color: TOTAL_COLOR }}>Total: {formatMoney(b.cash + b.credit, b.currency)}</p>
-          <p style={{ color: CASH_CREDIT_COLORS.cash }}>Cash: {formatMoney(b.cash, b.currency)}</p>
-          <p style={{ color: CASH_CREDIT_COLORS.credit }}>Credit: {formatMoney(b.credit, b.currency)}</p>
-        </div>
-      ))}
+      {/* A month with no rows at all (a gap the pivot zero-filled) has an
+          empty breakdown — show the zeroed totals rather than nothing. */}
+      {row.breakdown.length === 0 ? (
+        <>
+          {showSales && <p style={{ color: SALES_COLOR }}>Sales {formatMoney(0, null)}</p>}
+          {showPurchase && <p style={{ color: PURCHASE_COLOR }}>Purchase {formatMoney(0, null)}</p>}
+        </>
+      ) : (
+        row.breakdown.map((b) => (
+          <div key={b.currency} className="space-y-0.5">
+            <p className="text-xs font-semibold text-gray-500">{b.currency}</p>
+            {showSales && <p style={{ color: SALES_COLOR }}>Sales {formatMoney(b.revenue, b.currency)}</p>}
+            {showPurchase && <p style={{ color: PURCHASE_COLOR }}>Purchase {formatMoney(b.purchase, b.currency)}</p>}
+          </div>
+        ))
+      )}
     </div>
   )
 }
 
+// Which line(s) to draw. 'both' overlays them on one axis for comparison;
+// the single-series variants let Sales and Purchase sit in their own
+// sections, each readable on its own scale.
+export type TrendSeries = 'sales' | 'purchase' | 'both'
+
 interface Props {
-  data: CashCreditPivotRow[]
+  data: MonthlyTrendPivotRow[]
+  series?: TrendSeries
 }
 
-// 3 lines over time — Total, Cash, Credit. Values are cross-currency
-// magnitudes; hover/tap a point for the real per-currency breakdown.
-export default function MonthlyTrendChart({ data }: Props) {
+// Two lines over time — sales and purchase spend, so the two can be read
+// against each other month by month. Values are cross-currency magnitudes;
+// hover/tap a point for the real per-currency breakdown of both.
+export default function MonthlyTrendChart({ data, series = 'both' }: Props) {
+  const showSales = series !== 'purchase'
+  const showPurchase = series !== 'sales'
   const containerRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
 
@@ -65,11 +87,18 @@ export default function MonthlyTrendChart({ data }: Props) {
             tickLine={false}
           />
           <YAxis tickFormatter={formatK} tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={52} />
-          <Tooltip content={<CustomTooltip />} />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Line type="monotone" dataKey="total" name="Total" stroke={TOTAL_COLOR} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-          <Line type="monotone" dataKey="cash" name="Cash" stroke={CASH_CREDIT_COLORS.cash} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-          <Line type="monotone" dataKey="credit" name="Credit" stroke={CASH_CREDIT_COLORS.credit} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+          <Tooltip content={<CustomTooltip series={series} />} />
+          {/* A legend only earns its space when there are two lines to tell
+              apart — a single-series chart is already named by its heading. */}
+          {series === 'both' && (
+            <Legend verticalAlign="top" height={28} iconType="plainline" wrapperStyle={{ fontSize: 12 }} />
+          )}
+          {showSales && (
+            <Line type="monotone" dataKey="total" name="Sales" stroke={SALES_COLOR} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+          )}
+          {showPurchase && (
+            <Line type="monotone" dataKey="totalPurchase" name="Purchase" stroke={PURCHASE_COLOR} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+          )}
         </LineChart>
       </ResponsiveContainer>
     </div>

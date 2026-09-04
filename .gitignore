@@ -19,9 +19,14 @@ dist/
 # Visual Studio
 .vs/
 
-# internal planning docs & local SQL scripts — not for the public repo
+# internal planning docs & local SQL scripts — not for the public repo.
+# README.md is deliberately NOT covered: a blanket *.md rule kept every piece
+# of documentation out of the repo, and only failed to hide the README
+# because that file was tracked before the rule was added. Name internal docs
+# individually instead.
 *.sql
-*.md
+PLAN.md
+NOTES.md
 
 
 # local development files

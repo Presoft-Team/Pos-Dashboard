@@ -9,6 +9,7 @@ import { formatAmount } from '@/lib/currency'
 import Combobox from '@/components/combobox'
 import GroupByToggle from '@/components/group-by-toggle'
 import SortSelect from '@/components/sort-select'
+import ItemDetail from '@/components/item-detail'
 
 interface ItemGroup {
   item_id: string
@@ -72,11 +73,11 @@ const COSTING_METHOD_LABELS: Record<CostingMethod, string> = {
 }
 
 const SORT_OPTIONS = [
-  { value: 'item_code', label: 'Item Code (A–Z)' },
-  { value: 'cost_desc', label: 'Cost: High to Low' },
-  { value: 'cost_asc', label: 'Cost: Low to High' },
-  { value: 'price_desc', label: 'Unit Price: High to Low' },
-  { value: 'price_asc', label: 'Unit Price: Low to High' },
+  { value: 'item_code', label: 'Item Code' },
+  { value: 'cost_asc', label: 'Cost' },
+  { value: 'cost_desc', label: 'Cost desc' },
+  { value: 'price_asc', label: 'Unit Price' },
+  { value: 'price_desc', label: 'Unit Price desc' },
 ] as const
 
 const LOCATION_TABLE_INITIAL_VISIBLE = 5
@@ -89,9 +90,19 @@ const LOCATION_TABLE_SHOW_MORE_STEP = 5
 // header ("Standard Cost"), so repeating it per location would be
 // redundant; every other method's cost genuinely varies by location, so it
 // belongs here instead of the header.
-function LocationStockTable({ locations, costingMethod }: { locations: ItemGroup['locations']; costingMethod: CostingMethod }) {
+function LocationStockTable({
+  locations,
+  costingMethod,
+  qtyOnly = false,
+}: {
+  locations: ItemGroup['locations']
+  costingMethod: CostingMethod
+  // The collapsed card shows location and quantity only — cost belongs to
+  // the full record in the detail overlay.
+  qtyOnly?: boolean
+}) {
   const [visibleCount, setVisibleCount] = useState(LOCATION_TABLE_INITIAL_VISIBLE)
-  const showCost = costingMethod !== FIXED_COST
+  const showCost = !qtyOnly && costingMethod !== FIXED_COST
 
   const visibleLocations = locations.slice(0, visibleCount)
   const hasMore = visibleCount < locations.length
@@ -156,39 +167,18 @@ function LocationStockTable({ locations, costingMethod }: { locations: ItemGroup
   )
 }
 
-// All 6 of ItemUOM's price tiers, plus the min/max across whichever tiers
-// are actually set. A tier that's null in the database is hidden entirely,
-// not shown as 0 — "not set" and "priced at 0" are different things, and
-// showing a fake 0 would misrepresent items that just don't use that tier.
-function PriceTiers({ item }: { item: ItemGroup }) {
-  const tiers = [
-    { label: 'Price 1', value: item.price1 },
-    { label: 'Price 2', value: item.price2 },
-    { label: 'Price 3', value: item.price3 },
-    { label: 'Price 4', value: item.price4 },
-    { label: 'Price 5', value: item.price5 },
-    { label: 'Price 6', value: item.price6 },
-  ].filter((t): t is { label: string; value: number } => t.value !== null)
-
-  if (tiers.length === 0 && item.min_price === null && item.max_price === null) return null
-
-  return (
-    <div className="px-5 py-3 border-b border-gray-100 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-      {tiers.map((t) => (
-        <p key={t.label} className="text-gray-400">{t.label} <span className="text-gray-700 font-medium">{formatAmount(t.value)}</span></p>
-      ))}
-      {item.min_price !== null && (
-        <p className="text-gray-400">Min Price <span className="text-gray-700 font-medium">{formatAmount(item.min_price)}</span></p>
-      )}
-      {item.max_price !== null && (
-        <p className="text-gray-400">Max Price <span className="text-gray-700 font-medium">{formatAmount(item.max_price)}</span></p>
-      )}
-    </div>
-  )
-}
 
 const ITEM_LIST_INITIAL_VISIBLE = 5
 const ITEM_LIST_SHOW_MORE_STEP = 5
+
+// The single cost the collapsed card shows. Fixed Cost items have one
+// item-wide figure; every other method's cost varies by location, so the
+// highest is shown as the representative one — the per-location breakdown
+// is in the detail overlay.
+function collapsedCostOf(item: ItemGroup): number {
+  if (item.costing_method === FIXED_COST) return item.standard_cost
+  return item.locations.reduce((max, l) => Math.max(max, l.cost), 0)
+}
 
 // Catalog/master-data page — NOT a sales-performance page. Default view
 // shows the top items ranked by `sort`; searching by name/ID switches to a
@@ -202,6 +192,7 @@ export default function ItemPage() {
   const [items, setItems] = useState<ItemGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [visibleItemCount, setVisibleItemCount] = useState(ITEM_LIST_INITIAL_VISIBLE)
+  const [detailItem, setDetailItem] = useState<string | null>(null)
 
   // Debounced so fast typing doesn't fire an RPC call per keystroke.
   useEffect(() => {
@@ -222,12 +213,14 @@ export default function ItemPage() {
     setLoading(true)
     // p_limit: null (= no LIMIT) fetches every matching item — the "Show 5
     // more / Show all / Show less" controls below do the actual paginating
-    // client-side, same reasoning as the Performance page's breakdown tables.
+    // client-side, same reasoning as the Sales page's breakdown tables.
     const { data, error } = await supabase.rpc('get_item_catalog_v2', {
       p_search: search.trim() || null,
       p_item: filters.item || null,
       p_item_group: filters.item_group || null,
       p_item_type: filters.item_type || null,
+      // The one page that still filters by Location — passed explicitly
+      // rather than via toParams(), which no longer sends p_location.
       p_location: filters.location || null,
       p_sort: sort,
       p_limit: null,
@@ -282,7 +275,9 @@ export default function ItemPage() {
       {/* Filters — mobile: Search / Sort(60%)+Location(40%) / Toggle+Item,
           each its own row; desktop: single wrapped line. Different enough
           splits (mobile pairs Location with Sort, desktop pairs Location
-          with Search) that it's two layouts, same pattern as FilterBar. */}
+          with Search) that it's two layouts, same pattern as FilterBar.
+          Location lives here and nowhere else — it was removed from the
+          shared FilterBar, so this page owns the only one left. */}
       <div className="sm:hidden space-y-2">
         <div className="relative w-full">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -294,11 +289,8 @@ export default function ItemPage() {
             className="w-full h-9 pl-9 pr-3 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
           />
         </div>
-        <div className="grid grid-cols-[3fr_2fr] gap-2">
-          <div className="min-w-0">
-            <SortSelect value={sort} options={SORT_OPTIONS} onChange={setSort} ariaLabel="Sort by" />
-          </div>
-          <div className="min-w-0">
+        <div className="flex gap-2">
+          <div className="flex-1 min-w-0">
             <Combobox
               value={filters.location}
               onChange={(v) => setFilters({ ...filters, location: v })}
@@ -308,6 +300,7 @@ export default function ItemPage() {
               fullWidth
             />
           </div>
+          <SortSelect value={sort} options={SORT_OPTIONS} onChange={setSort} ariaLabel="Sort by" />
         </div>
         <div className="flex gap-2">
           <div className="flex-1 min-w-0">
@@ -318,9 +311,8 @@ export default function ItemPage() {
       </div>
 
       <div className="hidden sm:flex sm:flex-col sm:gap-2">
-        {/* Search 60% / Sort 40% */}
-        <div className="grid grid-cols-[6fr_4fr] gap-2">
-          <div className="relative min-w-0">
+        <div className="flex gap-2">
+          <div className="relative flex-1 min-w-0">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
@@ -330,9 +322,7 @@ export default function ItemPage() {
               className="w-full h-9 pl-9 pr-3 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
             />
           </div>
-          <div className="min-w-0">
-            <SortSelect value={sort} options={SORT_OPTIONS} onChange={setSort} ariaLabel="Sort by" />
-          </div>
+          <SortSelect value={sort} options={SORT_OPTIONS} onChange={setSort} ariaLabel="Sort by" />
         </div>
         {/* Toggle 20% / Item-Group-Type combobox 40% / Location 40% — each
             grid child wrapped in min-w-0, otherwise a grid item's default
@@ -366,7 +356,11 @@ export default function ItemPage() {
       ) : (
         <div className="space-y-4">
           {items.slice(0, visibleItemCount).map((item) => (
-            <div key={item.item_id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div
+              key={item.item_id}
+              onClick={() => setDetailItem(item.item_code)}
+              className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden cursor-pointer hover:border-gray-300 hover:shadow transition-colors"
+            >
               <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3 min-w-0">
                   {item.has_image ? (
@@ -388,19 +382,17 @@ export default function ItemPage() {
                     </p>
                   </div>
                 </div>
+                {/* Collapsed: one cost and one price. Costing method, the
+                    other five price tiers, and per-location cost all live in
+                    the detail overlay. */}
                 <div className="text-right shrink-0 text-xs">
-                  <p className="text-gray-400">Costing Method <span className="text-gray-700 font-medium">{COSTING_METHOD_LABELS[item.costing_method]}</span></p>
-                  {item.costing_method === FIXED_COST && (
-                    <p className="text-gray-400">Standard Cost <span className="text-gray-700 font-medium">{formatAmount(item.standard_cost)}</span></p>
-                  )}
+                  <p className="text-gray-400">Cost <span className="text-gray-700 font-medium">{formatAmount(collapsedCostOf(item))}</span></p>
                   <p className="text-gray-400">Price <span className="text-gray-700 font-medium">{formatAmount(item.unit_price)}</span></p>
                 </div>
               </div>
 
-              <PriceTiers item={item} />
-
               {item.locations.length > 0 ? (
-                <LocationStockTable locations={item.locations} costingMethod={item.costing_method} />
+                <LocationStockTable locations={item.locations} costingMethod={item.costing_method} qtyOnly />
               ) : (
                 <p className="px-5 py-3 text-xs text-gray-400">No stock location recorded</p>
               )}
@@ -437,6 +429,13 @@ export default function ItemPage() {
           )}
         </div>
       )}
+
+      <ItemDetail
+        itemCode={detailItem}
+        onClose={() => setDetailItem(null)}
+        filters={filters}
+        history="both"
+      />
     </div>
   )
 }

@@ -25,8 +25,8 @@ interface Props {
   // track and leaves a real gap instead of letting the next slot (Export)
   // fill it.
   trailing?: ReactNode[]
-  // Overrides the default from/to date pickers (e.g. Sales Dashboard's
-  // preset selector) when provided. Other pages keep the plain pickers.
+  // Overrides the default from/to date pickers (e.g. a page's preset
+  // selector) when provided. Other pages keep the plain pickers.
   datePicker?: ReactNode
   // Purchase has no Sales Agent concept and shows Creditor instead of
   // Debtor — these default to the original Sales/Monthly/Performance/Item
@@ -37,9 +37,9 @@ interface Props {
   showCreditor?: boolean
 }
 
-// Global FilterBar (PLAN.md Section 3) — shared by Sales Dashboard, Monthly
-// Sales, Performance, and Item pages. Date range + 4 entity fields (Location,
-// Item, Sales Agent, Debtor) + Item Group/Item Type. Every field
+// Global FilterBar (PLAN.md Section 3) — shared by the Monthly Sales
+// landing page and the Sales, Purchase, and Item pages. Date range + 3 entity fields (Item,
+// Sales Agent, Debtor) + Item Group/Item Type. Every field
 // except date range is a Combobox — click for the full list (same as a
 // plain <select>), or type to live-filter it by name. An entity field with
 // an empty option list (nothing to filter by) hides itself entirely — see
@@ -81,10 +81,6 @@ export default function FilterBar({
       min={options.date_min ?? undefined} max={options.date_max ?? undefined}
       className={dateClass} aria-label="To date"
     />
-  )
-  const hasLocation = options.locations.length > 0
-  const location = (
-    <Combobox value={filters.location} onChange={(v) => set('location', v)} options={options.locations} placeholder="All Locations" ariaLabel="Location" fullWidth />
   )
   // One slot whose meaning follows the active Group By mode — Item, Item
   // Group, or Item Type — instead of showing all three at once. Hidden
@@ -135,9 +131,8 @@ export default function FilterBar({
   // Same flat list on both breakpoints — toggle and the dynamic Item/Group/
   // Type field are separate cells (a shared cell was too cramped once the
   // desktop grid went to 5 columns/20% each; at that width each field
-  // needs its own cell, same as Location/Sales Agent/Debtor).
+  // needs its own cell, same as Sales Agent/Debtor).
   const entityFields: { key: string; node: ReactNode }[] = [
-    ...(hasLocation ? [{ key: 'location', node: location }] : []),
     ...(toggle ? [{ key: 'toggle', node: toggle }] : []),
     ...(hasItemDynamic ? [{ key: 'item', node: itemDynamic }] : []),
     ...(hasSalesAgent ? [{ key: 'salesAgent', node: salesAgent }] : []),

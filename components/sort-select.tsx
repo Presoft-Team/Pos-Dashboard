@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, Check } from 'lucide-react'
+import { ArrowUpDown, Check } from 'lucide-react'
 
 export interface SortOption {
   value: string
@@ -15,12 +15,11 @@ interface Props {
   ariaLabel?: string
 }
 
-// Small custom dropdown for a fixed set of sort options — same visual
-// language as Combobox (rounded pill, chevron, brand-highlighted selected
-// row) but without a search input or "All" clear state, since sort always
-// has exactly one active value. Replaces a plain <select>, whose native
-// option-list styling (especially on mobile) doesn't match the rest of the
-// app and whose width collapses awkwardly in a flex row on desktop.
+// Icon-only trigger for a fixed set of sort options — pressing it opens a
+// dropdown to pick from, so the control stays a fixed 9x9 square instead of
+// growing to fit whichever option label is selected. Same brand-highlighted
+// selected row as Combobox, but no search input or "All" clear state, since
+// sort always has exactly one active value.
 export default function SortSelect({ value, options, onChange, ariaLabel = 'Sort by' }: Props) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -35,23 +34,22 @@ export default function SortSelect({ value, options, onChange, ariaLabel = 'Sort
   }, [])
 
   return (
-    <div ref={rootRef} className="relative w-full min-w-0">
+    <div ref={rootRef} className="relative shrink-0">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label={ariaLabel}
+        aria-label={selected ? `${ariaLabel}: ${selected.label}` : ariaLabel}
         aria-expanded={open}
         aria-haspopup="listbox"
-        className="h-9 w-full flex items-center justify-between gap-2 pl-3 pr-2.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
+        className="h-9 w-9 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-sm hover:bg-gray-50 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent"
       >
-        <span className="truncate">{selected?.label ?? ariaLabel}</span>
-        <ChevronDown size={14} className={`text-gray-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ArrowUpDown size={15} />
       </button>
 
       {open && (
         <ul
           role="listbox"
-          className="absolute z-20 mt-1 w-full max-h-72 overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg py-1 text-sm"
+          className="absolute z-20 right-0 mt-1 min-w-max max-h-72 overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg py-1 text-sm"
         >
           {options.map((o) => (
             <li

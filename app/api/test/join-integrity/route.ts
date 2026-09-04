@@ -1,17 +1,15 @@
 // Standalone endpoint for the /test page — same pattern as
-// /api/test/credit-paid. Queries SQL Server directly via lib/mssql.ts.
+// /api/test/credit-paid: proxied to the configured presoft-api.
+//
+// NOTE: /api/v1/test/join-integrity does not exist on presoft-api yet —
+// this is the dashboard-side hookup waiting for it.
 import { NextResponse } from 'next/server'
-import { getRevenueJoinIntegrity } from '@/lib/db/queries/testQueries'
+import { apiFetch } from '@/lib/presoft-api'
 
 export async function GET() {
-  try {
-    const data = await getRevenueJoinIntegrity()
-    return NextResponse.json(data)
-  } catch (err) {
-    console.error('GET /api/test/join-integrity failed:', err)
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Query failed' },
-      { status: 500 }
-    )
-  }
+  const { res, error } = await apiFetch('/api/v1/test/join-integrity')
+  if (error) return error
+
+  const body = await res.json().catch(() => ({}))
+  return NextResponse.json(body, { status: res.ok ? 200 : res.status })
 }

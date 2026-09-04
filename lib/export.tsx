@@ -9,7 +9,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import html2canvas from 'html2canvas-pro'
 import jsPDF from 'jspdf'
 import { Filters, FilterOptions, EntityOption } from '@/types'
-import { formatAmount } from '@/lib/currency'
+import { formatMoney } from '@/lib/currency'
 
 // Portrait PDF pages are taller than wide, so capturing at full desktop width
 // (~1280px) produces a landscape-shaped image that wastes most of the page.
@@ -37,7 +37,6 @@ export function formatFilterSummary(filters: Filters, options?: FilterOptions): 
       ? `Date: ${filters.date_from || 'earliest'} to ${filters.date_to || 'latest'}`
       : 'Date: All'
   )
-  parts.push(`Location: ${filters.location ? nameOf(options?.locations, filters.location) : 'All'}`)
   parts.push(`Item: ${filters.item ? nameOf(options?.items, filters.item) : 'All'}`)
   parts.push(`Sales Agent: ${filters.sales_agent ? nameOf(options?.sales_agents, filters.sales_agent) : 'All'}`)
   parts.push(`Debtor: ${filters.debtor ? nameOf(options?.debtors, filters.debtor) : 'All'}`)
@@ -51,18 +50,44 @@ function fmtInt(n: unknown) {
   return new Intl.NumberFormat('en-MY').format(Number(n ?? 0))
 }
 
-// Shared column set for every Cash/Credit-split entity-revenue table —
-// Sales Dashboard's Best Sellers, and Performance's 4 breakdown tables.
-// nameKey/nameLabel let each caller supply its own first column
-// (bucket_name for Best Sellers, name for Performance's 4 dimensions).
+// Money column with the currency printed alongside the figure ("RM 1,234.00")
+// rather than split into a Currency column of its own — the PDF mirrors what
+// the on-screen tables show. Excel is unaffected: it always receives the raw
+// numeric row[key], so amounts stay sortable and summable in a spreadsheet.
+function money(key: string, label: string): ExportColumn {
+  return {
+    key, label, align: 'right',
+    formatForPdf: (r) => formatMoney(Number(r[key] ?? 0), String(r.currency ?? '')),
+  }
+}
+
+// Column set for the item-sourced tables — the Sales page's Item breakdown.
+// Those come from stock-document lines, which is why they can carry a Qty;
+// see entityRevenueOnlyColumns below for the AR-sourced tables that can't.
+// nameKey/nameLabel let each caller supply its own first column.
 export function entityRevenueColumns(nameKey: string, nameLabel: string): ExportColumn[] {
   return [
     { key: nameKey, label: nameLabel },
-    { key: 'currency', label: 'Currency' },
-    { key: 'credit_qty', label: 'Credit Qty', align: 'right', formatForPdf: (r) => fmtInt(r.credit_qty) },
-    { key: 'cash_qty', label: 'Cash Qty', align: 'right', formatForPdf: (r) => fmtInt(r.cash_qty) },
-    { key: 'credit_revenue', label: 'Credit Revenue', align: 'right', formatForPdf: (r) => formatAmount(Number(r.credit_revenue ?? 0)) },
-    { key: 'cash_revenue', label: 'Cash Revenue', align: 'right', formatForPdf: (r) => formatAmount(Number(r.cash_revenue ?? 0)) },
+    { key: 'qty', label: 'Qty', align: 'right', formatForPdf: (r) => fmtInt(r.qty) },
+    money('revenue', 'Revenue'),
+  ]
+}
+
+// Purchase twin of entityRevenueOnlyColumns — for the Creditor breakdown,
+// whose rows come from AP document headers and so carry no quantity.
+export function entityPurchaseOnlyColumns(nameKey: string, nameLabel: string): ExportColumn[] {
+  return [
+    { key: nameKey, label: nameLabel },
+    money('purchase', 'Purchase'),
+  ]
+}
+
+// Revenue-only variant, for the tables whose rows come from AR document
+// headers (Sales Agent, Debtor, Monthly) — those carry no quantity.
+export function entityRevenueOnlyColumns(nameKey: string, nameLabel: string): ExportColumn[] {
+  return [
+    { key: nameKey, label: nameLabel },
+    money('revenue', 'Revenue'),
   ]
 }
 
@@ -71,11 +96,23 @@ export function entityRevenueColumns(nameKey: string, nameLabel: string): Export
 export function entityPurchaseColumns(nameKey: string, nameLabel: string): ExportColumn[] {
   return [
     { key: nameKey, label: nameLabel },
-    { key: 'currency', label: 'Currency' },
-    { key: 'credit_qty', label: 'Credit Qty', align: 'right', formatForPdf: (r) => fmtInt(r.credit_qty) },
-    { key: 'cash_qty', label: 'Cash Qty', align: 'right', formatForPdf: (r) => fmtInt(r.cash_qty) },
-    { key: 'credit_purchase', label: 'Credit Purchase', align: 'right', formatForPdf: (r) => formatAmount(Number(r.credit_purchase ?? 0)) },
-    { key: 'cash_purchase', label: 'Cash Purchase', align: 'right', formatForPdf: (r) => formatAmount(Number(r.cash_purchase ?? 0)) },
+    { key: 'qty', label: 'Qty', align: 'right', formatForPdf: (r) => fmtInt(r.qty) },
+    money('purchase', 'Purchase'),
+  ]
+}
+
+// Columns for the Recent Sales / Recent Purchases document lists. One row
+// per document rather than per bucket, so the first column is a doc no, not
+// an entity name. `showAgent` is false on the purchase side, where AP
+// documents carry no sales agent.
+export function documentColumns(partyLabel: string, showAgent: boolean): ExportColumn[] {
+  return [
+    { key: 'doc_date', label: 'Date', formatForPdf: (r) => String(r.doc_date ?? '').slice(0, 10) },
+    { key: 'doc_no', label: 'Doc No' },
+    { key: 'doc_type', label: 'Type' },
+    { key: 'party_name', label: partyLabel },
+    ...(showAgent ? [{ key: 'agent', label: 'Agent' } as ExportColumn] : []),
+    money('amount', 'Amount'),
   ]
 }
 

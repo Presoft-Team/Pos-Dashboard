@@ -10,21 +10,19 @@ export interface DatePreset {
   days?: number
 }
 
-// Sales Dashboard & Performance — short-range glancing presets.
-export const DASHBOARD_PRESETS: DatePreset[] = [
+// One set for every page. There used to be two — a wider Dashboard set
+// including 30 Days and 4 Months, and a longer-range Monthly set — which is
+// why pages passed their own list and Monthly reconciled ranges it couldn't
+// represent. With those two presets gone the sets are identical, so there is
+// one list and nothing to reconcile.
+export const DATE_PRESETS: DatePreset[] = [
+  // Exactly 30 days back from today, not calendar-month arithmetic — a
+  // fixed window rather than one that swings between 28 and 31 days
+  // depending on which month it lands in.
   { key: '30d', label: '30 Days', days: 30 },
-  { key: '4m', label: '4 Months', months: 4 },
+  { key: '3m', label: '3 Months', months: 3 },
   { key: '6m', label: '6 Months', months: 6 },
-  { key: '12m', label: '12 Months', months: 12 },
-]
-
-// Monthly Sales — trend page, longer ranges only. Shares the '6m'/'12m'
-// keys with DASHBOARD_PRESETS on purpose — same key, same computed range,
-// so a page-reconciliation check (see MonthlyPage) can tell "this shared
-// date range is one Monthly can also represent" from "it's a Dashboard-only
-// preset (30 Days / 4 Months) that Monthly has no button for."
-export const MONTHLY_PRESETS: DatePreset[] = [
-  { key: '6m', label: '6 Months', months: 6 },
+  { key: '9m', label: '9 Months', months: 9 },
   { key: '12m', label: '12 Months', months: 12 },
 ]
 
@@ -54,9 +52,8 @@ export function findMatchingPreset(filters: Pick<Filters, 'date_from' | 'date_to
   return presets.find((p) => matchesPreset(filters, p))
 }
 
-// Initial filter state for a page using this component — first preset in
-// the given list (or Dashboard's set by default).
-export function defaultDateRange(presets: DatePreset[] = DASHBOARD_PRESETS) {
+// Initial filter state for a page using this component — the first preset.
+export function defaultDateRange(presets: DatePreset[] = DATE_PRESETS) {
   return computeRange(presets[0])
 }
 
@@ -64,7 +61,8 @@ interface Props {
   filters: Filters
   options: FilterOptions
   onChange: (f: Filters) => void
-  // Which relative-range buttons to show — defaults to the Dashboard's set.
+  // Which relative-range buttons to show. Every page uses the default now;
+  // the prop stays so a page can narrow the set without a component change.
   presets?: DatePreset[]
 }
 
@@ -75,7 +73,7 @@ interface Props {
 // straight from `filters.date_from`/`date_to` (not locally tracked click
 // state) — so it stays correct even when the date range changes from
 // elsewhere (e.g. navigating in from another page's shared filter state).
-export default function DatePresetFilter({ filters, options, onChange, presets = DASHBOARD_PRESETS }: Props) {
+export default function DatePresetFilter({ filters, options, onChange, presets = DATE_PRESETS }: Props) {
   // Only needed so clicking "Custom" keeps the pickers open even if the
   // dates you're about to edit still happen to match a preset — the
   // moment you actually change either date it stops mattering, since the
@@ -93,33 +91,22 @@ export default function DatePresetFilter({ filters, options, onChange, presets =
   const dateClass =
     'h-9 min-w-0 w-full pl-3 pr-2 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent'
 
-  // Mobile: every preset button + Custom evenly fills one 100%-wide row
-  // (grid-colsN, not the inline-flex wrap that let labels ladder onto a
-  // ragged second line). Desktop: the toggle group is a *fixed* share of
-  // the row instead — 40% for the 5-button Dashboard/Performance set, 30%
-  // for Monthly's 3-button set — with the rest of the row either left
-  // blank (no Custom active) or split into two 30%-wide date inputs
-  // (Custom active); Monthly's 30/30/30 deliberately leaves 10% unused
-  // rather than stretching to fill it. Only 2 configurations exist in this
-  // app, so these are just literal Tailwind classes picked by a ternary,
-  // not computed — arbitrary-value classes have to appear as complete
-  // strings in source for Tailwind to find them.
-  const buttonCount = presets.length + 1
-  const isWideSet = buttonCount === 5 // Dashboard/Performance vs Monthly
-  const mobileGridColsClass = isWideSet ? 'grid-cols-5' : buttonCount === 3 ? 'grid-cols-3' : 'grid-cols-2'
-  const desktopRowColsClass = isWideSet
-    ? (showCustom ? 'sm:grid-cols-[4fr_3fr_3fr]' : 'sm:grid-cols-[4fr_6fr]')
-    : (showCustom ? 'sm:grid-cols-[3fr_3fr_3fr_1fr]' : 'sm:grid-cols-[3fr_7fr]')
-
+  // The parent (FilterBar) already gives this its own full-width row, so
+  // the toggle group sizes to its own content rather than to a fixed share
+  // of a grid — that share was tuned for 3 buttons and can't hold 6.
+  //
+  // Mobile: 3 per row, so "12 Months" still fits at 360px — six across would
+  // truncate every label. Desktop: one row at natural width, with the date
+  // inputs beside it when Custom is active.
   return (
-    <div className={`flex flex-col sm:grid ${desktopRowColsClass} gap-2 sm:items-center w-full`}>
-      <div className={`grid ${mobileGridColsClass} sm:flex sm:flex-wrap rounded-lg border border-gray-200 bg-white p-0.5 gap-0.5 w-full`}>
+    <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full">
+      <div className="grid grid-cols-3 sm:flex rounded-lg border border-gray-200 bg-white p-0.5 gap-0.5 w-full sm:w-auto shrink-0">
         {presets.map((p) => (
           <button
             key={p.key}
             type="button"
             onClick={() => selectPreset(p)}
-            className={`min-w-0 overflow-hidden text-ellipsis px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap sm:flex-1 ${
+            className={`min-w-0 overflow-hidden text-ellipsis px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
               !forceCustom && active?.key === p.key ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-50'
             }`}
           >
@@ -129,7 +116,7 @@ export default function DatePresetFilter({ filters, options, onChange, presets =
         <button
           type="button"
           onClick={() => setForceCustom(true)}
-          className={`min-w-0 overflow-hidden text-ellipsis px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap sm:flex-1 ${
+          className={`min-w-0 overflow-hidden text-ellipsis px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
             showCustom ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-50'
           }`}
         >
@@ -137,33 +124,23 @@ export default function DatePresetFilter({ filters, options, onChange, presets =
         </button>
       </div>
 
-      {showCustom ? (
-        // sm:contents on mobile keeps this as one flex row (from – to);
-        // on desktop it "disappears" so the two inputs become their own
-        // direct grid items instead of being squeezed into a single cell.
-        // The dash is sm:hidden — display:none removes it from grid flow
-        // entirely, so it doesn't eat a column on desktop.
-        <div className="flex items-center gap-2 w-full sm:contents">
+      {showCustom && (
+        // Capped on desktop so the two inputs stay input-sized instead of
+        // stretching across whatever width the buttons leave over.
+        <div className="flex items-center gap-2 w-full sm:max-w-md">
           <input
             type="date" value={filters.date_from} onChange={(e) => onChange({ ...filters, date_from: e.target.value })}
             min={options.date_min ?? undefined} max={options.date_max ?? undefined}
             className={dateClass} aria-label="From date"
           />
-          <span className="text-gray-400 text-sm shrink-0 sm:hidden">–</span>
+          <span className="text-gray-400 text-sm shrink-0">–</span>
           <input
             type="date" value={filters.date_to} onChange={(e) => onChange({ ...filters, date_to: e.target.value })}
             min={options.date_min ?? undefined} max={options.date_max ?? undefined}
             className={dateClass} aria-label="To date"
           />
         </div>
-      ) : (
-        // Desktop-only blank filler so the toggle group's fixed share
-        // (40%/30%) actually leaves visible empty space instead of
-        // stretching — mobile doesn't need it (flex-col just stacks).
-        <div className="hidden sm:block" />
       )}
-      {/* Monthly's 4th grid column (the deliberately-unused 10%) */}
-      {showCustom && !isWideSet && <div className="hidden sm:block" />}
     </div>
   )
 }
