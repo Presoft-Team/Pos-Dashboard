@@ -117,7 +117,7 @@ export default function SideDrawer({ open, onClose, onOpenSettings }: Props) {
                 UI over the same data, not a replacement, so the drawer has
                 to lead out of it as well as around it. */}
             <Link
-              href="/"
+              href="/monthly"
               onClick={onClose}
               className="flex items-center gap-3 px-3.5 py-2.5 rounded-[10px] border border-transparent text-ink font-semibold text-[13.5px] w-full text-left hover:bg-paper"
             >
