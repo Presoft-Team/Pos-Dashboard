@@ -16,6 +16,14 @@ const PUBLIC_PATHS = ['/login', '/api/auth/login', '/api/auth/logout']
 function isPublic(pathname: string): boolean {
   if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return true
   if (pathname.startsWith('/_next/') || pathname === '/favicon.ico') return true
+
+  // Files served straight out of /public -- the logo, icons, fonts. These
+  // must be reachable WITHOUT a session: the login page itself is shown to
+  // signed-out visitors, and if its <img src="/presoft.png"> gets bounced to
+  // /login like any other protected path, the browser receives an HTML
+  // redirect where it expected an image and renders a broken-image icon.
+  if (/\.(png|jpe?g|gif|svg|ico|webp|avif|woff2?|ttf|otf|txt|xml|webmanifest)$/i.test(pathname)) return true
+
   return false
 }
 
