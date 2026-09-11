@@ -15,7 +15,7 @@ export async function GET() {
   // Not using apiFetch here: this route's whole job is to report which
   // stage failed, so it needs the config and the raw fetch error
   // separately rather than a pre-baked error response.
-  const config = getApiConfig()
+  const config = await getApiConfig()
   if (!config) {
     return NextResponse.json({
       ok: false,

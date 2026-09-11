@@ -7,8 +7,18 @@
 // Deliberately not NEXT_PUBLIC_-prefixed / server-only: the browser never
 // talks to the IIS host directly, only this server does, so the API key
 // stays out of the client bundle.
+//
+// Multi-tenant: when a per-client login session exists (see
+// lib/auth/session.ts / app/api/auth/login), its resolved apiUrl/apiKey/
+// companyId — set once at login from the `clients` table — are used
+// instead of the env vars below. That keeps each signed-in client talking
+// to their OWN autocount-write-service. Deployments that haven't rolled
+// out DB-based logins yet (no SESSION_SECRET, or a request with no
+// session — e.g. hit directly without auth) fall back to
+// PRESOFT_API_URL/PRESOFT_API_KEY/PRESOFT_COMPANY_ID exactly as before.
 import 'server-only'
 import { NextResponse } from 'next/server'
+import { getDashboardSession } from '@/lib/auth/session'
 
 export interface ApiConfig {
   apiUrl: string
@@ -28,7 +38,7 @@ function normalizeApiUrl(raw: string): string {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`
 }
 
-export function getApiConfig(): ApiConfig | null {
+function getEnvApiConfig(): ApiConfig | null {
   const rawUrl = process.env.PRESOFT_API_URL
   const apiKey = process.env.PRESOFT_API_KEY
   if (!rawUrl?.trim() || !apiKey?.trim()) return null
@@ -42,6 +52,18 @@ export function getApiConfig(): ApiConfig | null {
   }
 }
 
+export async function getApiConfig(): Promise<ApiConfig | null> {
+  const session = await getDashboardSession()
+  if (session) {
+    return {
+      apiUrl: normalizeApiUrl(session.apiUrl),
+      apiKey: session.apiKey,
+      companyId: session.companyId,
+    }
+  }
+  return getEnvApiConfig()
+}
+
 export function apiHeaders(apiKey: string, extra?: Record<string, string>): Record<string, string> {
   return { 'x-api-key': apiKey, ...extra }
 }
@@ -53,7 +75,7 @@ export async function apiFetch(
   path: string,
   init?: RequestInit
 ): Promise<{ res: Response; error?: never } | { res?: never; error: NextResponse }> {
-  const config = getApiConfig()
+  const config = await getApiConfig()
   if (!config) {
     return {
       error: NextResponse.json(
@@ -83,7 +105,7 @@ export async function apiPost(
   path: string,
   body: Record<string, unknown> = {}
 ): Promise<{ res: Response; error?: never } | { res?: never; error: NextResponse }> {
-  const config = getApiConfig()
+  const config = await getApiConfig()
   return apiFetch(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
