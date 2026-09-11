@@ -112,20 +112,8 @@ export default function SideDrawer({ open, onClose, onOpenSettings }: Props) {
             </span>
           </button>
 
-          <div className="mt-auto pt-2 border-t border-border flex flex-col gap-1.5">
-            {/* Back to the eight production pages — /v2 is an alternative
-                UI over the same data, not a replacement, so the drawer has
-                to lead out of it as well as around it. */}
-            <Link
-              href="/monthly"
-              onClick={onClose}
-              className="flex items-center gap-3 px-3.5 py-2.5 rounded-[10px] border border-transparent text-ink font-semibold text-[13.5px] w-full text-left hover:bg-paper"
-            >
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <polyline points="15 18 9 12 15 6"></polyline>
-              </svg>
-              <span>Classic dashboard</span>
-            </Link>
+          <div className="mt-auto pt-2 border-t border-border flex flex-col">
+            
             <a
               href="/api/auth/logout"
               className="flex items-center gap-3 px-3.5 py-2.5 rounded-[10px] border border-transparent text-sand font-semibold text-[13.5px] w-full text-left hover:bg-paper hover:text-ink"
