@@ -224,7 +224,7 @@ export default function V2Dashboard({ clientName }: Props) {
         clientName={clientName}
       />
 
-      <div className="max-w-[640px] lg:max-w-[1180px] mx-auto px-4 pt-3.5 pb-10 flex flex-col gap-3.5">
+      <div className="max-w-[640px] lg:max-w-[1180px] mx-auto px-5 md:px-4 pt-3.5 pb-10 flex flex-col gap-3.5">
         {/* Fetches its own two days of documents — see
             components/v2/today-yesterday-box.tsx. */}
         <TodayYesterdayBox />

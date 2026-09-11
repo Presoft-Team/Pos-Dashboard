@@ -22,7 +22,7 @@ const GROUP_BY_OPTIONS: { value: V2GroupBy; label: string }[] = [
 
 export default function Header({ subtitle, groupBy, onGroupByChange, onOpenDrawer, clientName }: Props) {
   return (
-    <header className="sticky top-0 z-10 bg-paper/90 backdrop-blur-xs px-4 pt-3.5 pb-2.5 flex items-center justify-between border-b border-border gap-2">
+    <header className="sticky top-0 z-10 bg-paper/90 backdrop-blur-xs px-5 md:px-4 pt-3.5 pb-2.5 flex items-center justify-between border-b border-border gap-2">
       <div className="flex items-center gap-2.5 min-w-0">
         <button
           type="button"

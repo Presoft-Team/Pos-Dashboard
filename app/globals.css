@@ -49,6 +49,13 @@ body {
    Applied in app/(v2)/layout.tsx, so it cannot reach anything outside the
    (v2) route group. --- */
 .v2-scope {
+  /* A single wide child (the chart's track) would otherwise let the whole
+     page scroll sideways, and a phone responds by zooming out to fit --
+     which shrinks every margin on the page and reads as "no padding".
+     `clip` not `hidden`: hidden makes this a scroll container and kills
+     the sticky header inside it. */
+  overflow-x: clip;
+
   --color-ink: #14181f;
   --color-sand: #6b7280;
   --color-paper: #f7f8fa;

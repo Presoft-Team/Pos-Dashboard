@@ -76,7 +76,7 @@ export default function V2Items() {
 
   return (
     <>
-      <header className="sticky top-0 z-10 bg-paper/90 backdrop-blur-xs px-4 pt-3.5 pb-2.5 flex items-center justify-between border-b border-border">
+      <header className="sticky top-0 z-10 bg-paper/90 backdrop-blur-xs px-5 md:px-4 pt-3.5 pb-2.5 flex items-center justify-between border-b border-border">
         <div className="flex items-center gap-2.5 min-w-0">
           <Link
             href="/v2"
@@ -97,7 +97,7 @@ export default function V2Items() {
         </div>
       </header>
 
-      <div className="max-w-[640px] mx-auto px-4 pt-3.5 pb-10 flex flex-col gap-3.5">
+      <div className="max-w-[640px] mx-auto px-5 md:px-4 pt-3.5 pb-10 flex flex-col gap-3.5">
         <div className="bg-card border border-border rounded-2xl shadow-card px-4 pt-4 pb-3.5">
           <div className="mb-3.5">
             <h2 className="text-[14.5px] font-bold m-0 mb-0.5">All Items</h2>
