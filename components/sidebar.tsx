@@ -10,6 +10,7 @@ import {
   Users,
   Building2,
   UserRound,
+  Sparkles,
   X,
 } from 'lucide-react'
 
@@ -28,6 +29,10 @@ const NAV = [
   { href: '/debtor',      label: 'Debtor',      icon: Users },
   { href: '/creditor',    label: 'Creditor',    icon: Building2 },
   { href: '/sales-agent', label: 'Sales Agent', icon: UserRound },
+  // The ported "Ultimate Version" UI, mounted alongside the pages above
+  // rather than replacing any of them — it lives in its own (v2) route
+  // group with its own chrome, so it opens out of this shell.
+  { href: '/v2',          label: 'Dashboard v2', icon: Sparkles },
 ]
 
 interface Props {
