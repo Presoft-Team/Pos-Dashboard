@@ -32,8 +32,10 @@ Fill in `.env`:
 
 | Var | Description |
 | --- | --- |
-| `PRESOFT_API_URL` | Where autocount-write-service listens, e.g. `http://localhost:8099`. The `http://` is added for you if omitted. |
-| `PRESOFT_API_KEY` | Must match the service's `ApiKey` in its `deployment-settings.json` exactly — sent as `x-api-key` |
+| `PRESOFT_API_URL` | Where autocount-write-service listens, e.g. `http://localhost:8099`. The `http://` is added for you if omitted. Fallback used only when there's no per-client session (see "Login" below). |
+| `PRESOFT_API_KEY` | Must match the service's `ApiKey` in its `deployment-settings.json` exactly — sent as `x-api-key`. Same fallback-only caveat as above. |
+| `DATABASE_URL` | *(new, optional)* Postgres connection string (Railway) — the shared `clients` table that license-portal manages. Set this to enable per-client login. |
+| `SESSION_SECRET` | *(new, optional)* Random string signing this app's login session cookie. Required alongside `DATABASE_URL` to enable login. |
 
 There is no company/account-book setting here: the service is bound to one book by its own `connection-config.json`, chosen on its `/setup` page.
 
@@ -45,11 +47,42 @@ Next reads env files **once at startup** — editing one while `npm run dev` is 
 npm run dev
 ```
 
-Visit `http://localhost:3000`. There is no login; the dashboard loads straight to data.
+Visit `http://localhost:3000`. If `DATABASE_URL`/`SESSION_SECRET` are not set you land straight on the dashboard (no login, as before); otherwise you're redirected to `/login`.
 
-## No authentication
+## Login (per-client, multi-tenant)
 
-This app has no users, sessions, or login page. Anyone who can reach it gets the full dashboard, and presoft-api's own endpoints are gated by a shared API key rather than per-user auth. **Don't expose either service to an untrusted network as-is.**
+Presoft sells this dashboard to multiple client companies. Each client runs
+their own autocount-write-service on their own premises, reached only via
+their own DynDNS link/URL and their own API key. That per-client wiring
+(URL, API key, CompanyId, login username/password) is managed separately
+in the **license-portal** app (internal Presoft admin tool, not part of
+this repo) — see that repo's README for how to create client rows.
+
+To turn this on for a deployment, set `DATABASE_URL` and `SESSION_SECRET`
+in `.env` (see table above) — that database is the same Postgres `clients`
+table license-portal writes to. Once set:
+
+- `/login` accepts a client's username/password (checked against the
+  `clients` table, bcrypt-compared), rejects `SUSPENDED` accounts and
+  expired licenses, and signs a session cookie carrying that client's
+  resolved `apiUrl`/`apiKey`/`companyId`.
+- Every other route is protected by `middleware.ts` and redirects to
+  `/login` without a valid session.
+- `lib/presoft-api.ts`'s `getApiConfig()` reads that session first, so a
+  signed-in client's dashboard requests are automatically routed to
+  *their own* AutoCount write-service instance instead of a shared one.
+- `components/dashboard-shell.tsx` shows the signed-in client's name and a
+  Log out link.
+
+**Without `DATABASE_URL`/`SESSION_SECRET` set, none of this activates** —
+the app behaves exactly as before: no login page, `middleware.ts` lets
+every request through, and `getApiConfig()` falls back to the
+`PRESOFT_API_URL`/`PRESOFT_API_KEY` env vars below. This keeps existing
+single-tenant deployments working unchanged during rollout. In that
+fallback mode only, the old warning still applies: anyone who can reach
+the app gets the full dashboard, and presoft-api's own endpoints are
+gated by a shared API key rather than per-user auth — don't expose either
+service to an untrusted network as-is.
 
 ## How data fetching works
 
@@ -92,8 +125,10 @@ app/
   api/openapi.json/       proxies presoft-api's own spec
   api-docs/               Swagger UI over that spec
 lib/
-  presoft-api.ts          PRESOFT_API_URL/KEY resolution + apiFetch() helper
+  presoft-api.ts          PRESOFT_API_URL/KEY resolution (session-first, env fallback) + apiFetch() helper
+  auth/session.ts         per-client login session (signed cookie)
   db/client.ts            rpc() shim — calls this app's own /api/presoft/*
+  db/tenant.ts            reads the `clients` table (shared with license-portal)
   filters.ts              Filters -> query params
   filter-context.tsx      shared filter/groupBy state across pages
   currency.ts             per-currency money formatting + chart pivoting
@@ -107,4 +142,4 @@ types/index.ts            row shapes returned by presoft-api
 - `/api/test/credit-paid` and `/api/test/join-integrity` are dashboard-side hookups for `/api/v1/test/*` endpoints that **don't exist on the service**. Nothing calls them; they'll 404 until that side is built.
 - **Which accounts count as revenue/purchase is still provisional.** The service currently takes every account in the 5xxx range as revenue and 6xxx as purchase. That sweeps in contra accounts (`DISCOUNT ALLOWED` adds to revenue instead of reducing it) and misses credit notes posted outside those ranges. Pending a decision on an explicit account map.
 - The Location filter exists only on the Item page; it was removed from the shared filter bar and from the Sales/Purchase breakdowns.
-- No authentication, as above.
+- No authentication when `DATABASE_URL`/`SESSION_SECRET` are unset — see "Login" above.
