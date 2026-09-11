@@ -38,7 +38,12 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  const loginUrl = new URL('/login', req.url)
+  // Clone nextUrl rather than building from req.url: behind a proxy the raw
+  // request URL carries the container's internal host, which would redirect
+  // the browser somewhere that only exists inside the deployment.
+  const loginUrl = req.nextUrl.clone()
+  loginUrl.pathname = '/login'
+  loginUrl.search = ''
   loginUrl.searchParams.set('next', pathname)
   return NextResponse.redirect(loginUrl)
 }
