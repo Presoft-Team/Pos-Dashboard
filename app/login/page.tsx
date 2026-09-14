@@ -27,10 +27,7 @@ function LoginForm() {
         setLoading(false)
         return
       }
-      // Honour ?next= (middleware sets it to whatever was asked for), and
-      // otherwise land on the v2 dashboard directly rather than on '/',
-      // which would only redirect there anyway.
-      router.push(params.get('next') ?? '/v2')
+      router.push(params.get('next') ?? '/')
       router.refresh()
     } catch {
       setError('Unable to reach the server')
