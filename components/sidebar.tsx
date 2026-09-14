@@ -10,17 +10,14 @@ import {
   Users,
   Building2,
   UserRound,
-  Sparkles,
   X,
 } from 'lucide-react'
 
 const NAV = [
-  // Monthly used to be the landing page at '/'. '/' now redirects to the
-  // v2 dashboard, so this entry points at its real path — which also means
-  // the active check below takes the normal prefix branch instead of the
-  // exact-match special case, and no longer lights up on a route that only
-  // redirects away.
-  { href: '/monthly',     label: 'Monthly',     icon: CalendarDays },
+  // Monthly is the landing page now — the old Sales Dashboard at '/' was
+  // removed, its KPI tiles moved to the Sales page, and its Revenue-by-Item
+  // chart/table dropped as duplicates of Sales' own Item breakdown.
+  { href: '/',            label: 'Monthly',     icon: CalendarDays },
   { href: '/sales',       label: 'Sales',       icon: BarChart3 },
   // First of the three Sales sub-pages — Area and Location follow once
   // this one's shape is confirmed.
@@ -31,10 +28,6 @@ const NAV = [
   { href: '/debtor',      label: 'Debtor',      icon: Users },
   { href: '/creditor',    label: 'Creditor',    icon: Building2 },
   { href: '/sales-agent', label: 'Sales Agent', icon: UserRound },
-  // The ported "Ultimate Version" UI, mounted alongside the pages above
-  // rather than replacing any of them — it lives in its own (v2) route
-  // group with its own chrome, so it opens out of this shell.
-  { href: '/v2',          label: 'Dashboard v2', icon: Sparkles },
 ]
 
 interface Props {
@@ -62,7 +55,7 @@ export default function Sidebar({ mobileOpen, onClose }: Props) {
         }`}
       >
         {/* Branding — desktop only; mobile gets its own top bar in dashboard-shell.tsx */}
-        <Link href="/monthly" onClick={onClose} className="hidden lg:flex flex-col items-start gap-0 px-6 py-2.5">
+        <Link href="/" onClick={onClose} className="hidden lg:flex flex-col items-start gap-0 px-6 py-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/presoft.png" alt="Presoft" className="h-12 w-auto" />
           <p className="text-brand font-bold text-base tracking-wide -mt-1">Dashboard Platform</p>

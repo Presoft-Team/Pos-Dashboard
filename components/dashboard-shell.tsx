@@ -20,9 +20,7 @@ export default function DashboardShell({ children, clientName }: Props) {
     <div className="flex flex-col lg:flex-row h-screen overflow-hidden">
       {/* Mobile top bar — brand identity, plus account/logout when signed in */}
       <header className="lg:hidden flex items-center justify-between px-4 py-2.5 bg-paper border-b border-ink/10 shrink-0">
-        {/* /monthly, not / — / redirects to the v2 dashboard, and the logo
-            inside the classic shell should stay inside it. */}
-        <Link href="/monthly" className="flex flex-col items-start gap-0 min-w-0">
+        <Link href="/" className="flex flex-col items-start gap-0 min-w-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/presoft.png" alt="Presoft" className="h-6 w-auto shrink-0" />
           <p className="text-brand font-bold text-xs tracking-wide -mt-0.5 truncate">Dashboard Platform</p>
